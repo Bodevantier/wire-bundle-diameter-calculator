@@ -549,7 +549,146 @@ const Circlify = (() => {
     });
   }
 
-  return { pack };
+  /* -----------------------------------------------------------------
+   * packBest: the A1.0 heuristic above is greedy — it places the biggest
+   * circle first, then each remaining circle wherever looks best *at that
+   * moment*, never reconsidering earlier placements. With several equal-size
+   * circles this can lock in a visibly loose layout no matter what order
+   * they're processed in (verified: exhaustively checked all 720 possible
+   * orderings for a 6-equal-circles case and every one converged to the same
+   * suboptimal result — so trying different orders doesn't help; the
+   * algorithm itself needs a second pass).
+   *
+   * packBest() takes the greedy result and refines it with a physics-style
+   * relaxation (pull circles toward the center, push apart any overlaps,
+   * repeat), including several attempts from random starting layouts to
+   * escape the greedy method's local optimum. It always compares against the
+   * plain greedy result and only keeps a candidate if it's strictly smaller
+   * — so this can never produce a worse (or invalid/overlapping) result than
+   * the original algorithm, only match or beat it.
+   * --------------------------------------------------------------- */
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function hashSeed(radii) {
+    let h = 2166136261;
+    for (const r of radii) {
+      const s = r.toFixed(6);
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+    }
+    return h >>> 0;
+  }
+
+  // circles: [{x,y,r}]. Mutates a copy; never modifies the input.
+  function relax(circles, iterations, pullFrac0, rng) {
+    const pts = circles.map(c => ({ x: c.x, y: c.y, r: c.r }));
+    const n = pts.length;
+    const cooldownEnd = iterations * 0.75;
+    for (let it = 0; it < iterations; it++) {
+      const pullFrac = pullFrac0 * Math.max(0, 1 - it / cooldownEnd);
+      if (pullFrac > 0) {
+        for (const p of pts) {
+          const d = Math.hypot(p.x, p.y);
+          if (d > 1e-9) {
+            const step = Math.min(pullFrac * p.r, d);
+            p.x -= (p.x / d) * step;
+            p.y -= (p.y / d) * step;
+          }
+        }
+      }
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const a = pts[i], b = pts[j];
+          let dx = b.x - a.x, dy = b.y - a.y;
+          let dist = Math.hypot(dx, dy);
+          const minD = a.r + b.r;
+          if (dist < minD) {
+            if (dist < 1e-9) {
+              const ang = rng() * 2 * Math.PI;
+              dx = Math.cos(ang); dy = Math.sin(ang); dist = 1e-6;
+            }
+            const overlap = (minD - dist) * 1.001; // slight overshoot avoids float-dust residual overlap
+            const ux = dx / dist, uy = dy / dist;
+            a.x -= (ux * overlap) / 2; a.y -= (uy * overlap) / 2;
+            b.x += (ux * overlap) / 2; b.y += (uy * overlap) / 2;
+          }
+        }
+      }
+    }
+    return pts;
+  }
+
+  function enclosingDiameterOf(positions, radii) {
+    const circles = positions.map((p, i) => ({ x: p.x, y: p.y, r: radii[i] }));
+    return enclose(circles).r * 2;
+  }
+
+  /**
+   * dataList: [{id, datum}], datum = (2 * packingRadius)^2.
+   * rPackById(id): returns the packing radius (real radius + clearance) for that id.
+   * Returns { circles: [{id,x,y,r}], enclosingRadius } in real mm space, recentered
+   * so the true minimal enclosing circle sits at the origin.
+   */
+  function packBest(dataList, rPackById, opts) {
+    opts = opts || {};
+    const n = dataList.length;
+    const trials = opts.trials ?? (n <= 10 ? 24 : n <= 20 ? 12 : n <= 40 ? 5 : n <= 80 ? 2 : 1);
+    const iterations = opts.iterations ?? (n <= 20 ? 1000 : n <= 40 ? 600 : n <= 80 ? 350 : 200);
+    const pullFrac = opts.pullFrac ?? 0.025;
+
+    const greedyVirtual = pack(dataList);
+    const maxVirtualR = Math.max(...greedyVirtual.map(c => c.r));
+    const ids = greedyVirtual.map(c => c.id);
+    const radii = ids.map(id => rPackById(id));
+    const maxRealR = Math.max(...radii);
+    const gScale = maxRealR / maxVirtualR;
+
+    let bestPositions = greedyVirtual.map(c => ({ x: c.x * gScale, y: c.y * gScale }));
+    let bestDiameter = enclosingDiameterOf(bestPositions, radii);
+
+    const rng = mulberry32(hashSeed(radii));
+
+    // Cheap polish pass starting from the greedy layout.
+    const polished = relax(bestPositions.map((p, i) => ({ x: p.x, y: p.y, r: radii[i] })), iterations, pullFrac, rng);
+    const polishedD = enclosingDiameterOf(polished, radii);
+    if (polishedD < bestDiameter) { bestDiameter = polishedD; bestPositions = polished; }
+
+    // Random-start trials to escape the greedy method's local optimum.
+    const totalArea = radii.reduce((s, r) => s + Math.PI * r * r, 0);
+    const spread = 1.3 * Math.sqrt(totalArea / Math.PI) + 2;
+    for (let t = 0; t < trials; t++) {
+      const start = radii.map(r => ({
+        x: (rng() * 2 - 1) * spread,
+        y: (rng() * 2 - 1) * spread,
+        r,
+      }));
+      const result = relax(start, iterations, pullFrac, rng);
+      const d = enclosingDiameterOf(result, radii);
+      if (d < bestDiameter) { bestDiameter = d; bestPositions = result; }
+    }
+
+    const enclosure = enclose(bestPositions.map((p, i) => ({ x: p.x, y: p.y, r: radii[i] })));
+    const circles = ids.map((id, i) => ({
+      id,
+      x: bestPositions[i].x - enclosure.x,
+      y: bestPositions[i].y - enclosure.y,
+      r: radii[i],
+    }));
+    return { circles, enclosingRadius: enclosure.r };
+  }
+
+  return { pack, packBest };
 })();
 
 /* ---------------------------------------------------------------------
@@ -704,25 +843,22 @@ function calculate() {
 
   const clearance = Math.max(0, Number(state.clearance) || 0);
   const circlesData = validWires.map((w, idx) => ({ id: idx, datum: Math.pow(w.diameter + 2 * clearance, 2) }));
+  const rPackById = (id) => (validWires[id].diameter + 2 * clearance) / 2;
 
-  let packed;
+  let result;
   try {
-    packed = Circlify.pack(circlesData);
+    result = Circlify.packBest(circlesData, rPackById);
   } catch (err) {
     showToast("Could not pack this bundle — check for invalid diameters.", "error");
     return;
   }
 
-  const maxVirtualRadius = Math.max(...packed.map(c => c.r));
-  const maxRealRadius = Math.max(...validWires.map(w => (w.diameter + 2 * clearance) / 2));
-  const scaleFactor = maxRealRadius / maxVirtualRadius;
-
-  const scaledCircles = packed.map(c => {
+  const scaledCircles = result.circles.map(c => {
     const wire = validWires[c.id];
-    return { x: c.x * scaleFactor, y: c.y * scaleFactor, r: wire.diameter / 2, wire };
+    return { x: c.x, y: c.y, r: wire.diameter / 2, wire };
   });
 
-  const enclosingRadius = Math.max(...scaledCircles.map(c => Math.hypot(c.x, c.y) + c.r + clearance));
+  const enclosingRadius = result.enclosingRadius;
   const enclosingDiameter = enclosingRadius * 2;
 
   renderResults(enclosingDiameter, validWires.length, clearance);
