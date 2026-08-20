@@ -135,6 +135,8 @@
   }
   table input[type=text],table input[type=number]{padding:5px 6px;font-size:.83rem;}
   td.awg-cell input, td.diam-cell input{width:64px;}
+  td.part-cell input{width:120px;}
+  td.type-cell input{width:90px;}
 
   .wires-list{
     display:flex;
@@ -554,17 +556,17 @@ const Circlify = (() => {
  * App state & UI
  * ------------------------------------------------------------------- */
 const DEFAULT_CATALOG = {
-  1: { part_no: "396476-002", type: "S2xTP", awg: 24, diameter: 4.1 },
-  2: { part_no: "256575-122", type: "TSP", awg: 22, diameter: 2.76 },
-  3: { part_no: "973285-001", type: "S4xTP", awg: 24, diameter: 7.36 },
-  4: { part_no: "253828-249", type: "TSP", awg: 24, diameter: 3.3 },
-  6: { part_no: "230202-022", type: "C", awg: 22, diameter: 1.09 },
+  1: { part_no: "EX-1001", type: "Single", awg: 20, diameter: 1.6 },
+  2: { part_no: "EX-1002", type: "Twisted Pair", awg: 22, diameter: 2.4 },
+  3: { part_no: "EX-1003", type: "Shielded", awg: 18, diameter: 3.2 },
+  4: { part_no: "EX-1004", type: "Coax", awg: 24, diameter: 2.0 },
+  5: { part_no: "EX-1005", type: "Multi-Core", awg: 16, diameter: 4.5 },
 };
 const DEFAULT_WIRES = [
-  { wire_no: "W19", fn: 6 }, { wire_no: "W20", fn: 6 },
-  { wire_no: "MC1", fn: 1 }, { wire_no: "MC2", fn: 2 },
-  { wire_no: "MC3", fn: 3 }, { wire_no: "MC4", fn: 4 },
-  { wire_no: "MC5", fn: 4 },
+  { wire_no: "Wire-01", fn: 1 }, { wire_no: "Wire-02", fn: 1 },
+  { wire_no: "Wire-03", fn: 2 }, { wire_no: "Wire-04", fn: 2 },
+  { wire_no: "Wire-05", fn: 3 }, { wire_no: "Wire-06", fn: 4 },
+  { wire_no: "Wire-07", fn: 5 },
 ];
 const DEFAULT_CLEARANCE = 0.1;
 const STORAGE_KEY = "wireBundleDiameterCalculator.v1";
@@ -605,8 +607,8 @@ function renderCatalog() {
     const row = state.catalog[fn];
     const tr = el("tr");
     tr.appendChild(el("td", { class: "fn-cell", text: String(fn) }));
-    tr.appendChild(el("td", {}, [el("input", { type: "text", value: row.part_no, "data-fn": fn, "data-field": "part_no" })]));
-    tr.appendChild(el("td", {}, [el("input", { type: "text", value: row.type, "data-fn": fn, "data-field": "type" })]));
+    tr.appendChild(el("td", { class: "part-cell" }, [el("input", { type: "text", value: row.part_no, "data-fn": fn, "data-field": "part_no" })]));
+    tr.appendChild(el("td", { class: "type-cell" }, [el("input", { type: "text", value: row.type, "data-fn": fn, "data-field": "type" })]));
     tr.appendChild(el("td", { class: "awg-cell" }, [el("input", { type: "number", step: "1", value: row.awg, "data-fn": fn, "data-field": "awg" })]));
     tr.appendChild(el("td", { class: "diam-cell" }, [el("input", { type: "number", step: "0.01", min: "0.01", value: row.diameter, "data-fn": fn, "data-field": "diameter" })]));
     tr.appendChild(el("td", {}, [el("button", { class: "icon-btn danger remove-fn-btn", type: "button", "data-fn": fn, "aria-label": "Remove type", title: "Remove type", text: "✕" })]));
@@ -801,12 +803,14 @@ function renderVisualization(circles, enclosingRadius, enclosingDiameter, wireCo
   titleEl2.textContent = titleLine2;
   svg.appendChild(titleEl2);
 
+  const encStrokeWidth = Math.max(0.15, enclosingRadius * 0.006);
   const enc = document.createElementNS(svgNS, "circle");
   enc.setAttribute("cx", 0); enc.setAttribute("cy", 0); enc.setAttribute("r", enclosingRadius);
   enc.setAttribute("fill", "none");
   enc.setAttribute("stroke", "#2196F3");
-  enc.setAttribute("stroke-width", Math.max(0.15, enclosingRadius * 0.006).toFixed(3));
-  enc.setAttribute("stroke-dasharray", "2,1.4");
+  enc.setAttribute("stroke-width", encStrokeWidth.toFixed(3));
+  enc.setAttribute("stroke-linecap", "round");
+  enc.setAttribute("stroke-dasharray", `0.01,${(encStrokeWidth * 4.5).toFixed(3)}`);
   svg.appendChild(enc);
 
   circles.forEach((c, idx) => {
@@ -824,30 +828,62 @@ function renderVisualization(circles, enclosingRadius, enclosingDiameter, wireCo
     circle.setAttribute("stroke", "#333333");
     circle.setAttribute("stroke-width", Math.max(0.08, c.r * 0.03).toFixed(3));
     g.appendChild(circle);
-
-    if (c.r >= enclosingRadius * 0.045) {
-      const fontSize = Math.min(c.r * 0.42, Math.max(c.r * 0.28, 1.1));
-      const lines = [c.wire.wire_no, c.wire.type, `AWG ${c.wire.awg}`, `Ø${c.wire.diameter}`];
-      const text = document.createElementNS(svgNS, "text");
-      text.setAttribute("x", c.x.toFixed(4));
-      text.setAttribute("y", c.y.toFixed(4));
-      text.setAttribute("text-anchor", "middle");
-      text.setAttribute("font-size", fontSize.toFixed(3));
-      text.setAttribute("fill", "#1a1a1a");
-      text.setAttribute("font-family", "sans-serif");
-      const lineHeight = fontSize * 1.05;
-      const startDy = -((lines.length - 1) / 2) * lineHeight;
-      lines.forEach((line, li) => {
-        const tspan = document.createElementNS(svgNS, "tspan");
-        tspan.setAttribute("x", c.x.toFixed(4));
-        tspan.setAttribute("dy", (li === 0 ? startDy : lineHeight).toFixed(3));
-        if (li === 0) tspan.setAttribute("font-weight", "700");
-        tspan.textContent = line;
-        text.appendChild(tspan);
-      });
-      g.appendChild(text);
-    }
     svg.appendChild(g);
+
+    if (c.r >= enclosingRadius * 0.02) {
+      const labelLines = [c.wire.wire_no, c.wire.type, `AWG ${c.wire.awg}`, `Ø${c.wire.diameter}`];
+      const buildLabel = (fontSize) => {
+        const text = document.createElementNS(svgNS, "text");
+        text.setAttribute("x", c.x.toFixed(4));
+        text.setAttribute("y", c.y.toFixed(4));
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("font-size", fontSize.toFixed(4));
+        text.setAttribute("fill", "#1a1a1a");
+        text.setAttribute("font-family", "sans-serif");
+        const lineHeight = fontSize * 1.08;
+        const startDy = -((labelLines.length - 1) / 2) * lineHeight;
+        labelLines.forEach((line, li) => {
+          const tspan = document.createElementNS(svgNS, "tspan");
+          tspan.setAttribute("x", c.x.toFixed(4));
+          tspan.setAttribute("dy", (li === 0 ? startDy : lineHeight).toFixed(4));
+          if (li === 0) tspan.setAttribute("font-weight", "700");
+          tspan.textContent = line;
+          text.appendChild(tspan);
+        });
+        return { text, lineHeight };
+      };
+
+      // Render once at a generous size, measure the ACTUAL rendered width of each
+      // line (not a character-count guess), then shrink to fit. Each line gets its
+      // own width budget based on the circle's chord width AT THAT LINE'S HEIGHT —
+      // a circle is narrower near its top/bottom, so the outer lines of a stack
+      // need a tighter budget than the middle ones, not one flat average width.
+      const n = labelLines.length;
+      let fontSize = Math.min(c.r * 0.42, enclosingRadius * 0.11);
+      let built = buildLabel(fontSize);
+      g.appendChild(built.text);
+      const tspans = built.text.querySelectorAll("tspan");
+      let requiredScale = 1;
+      tspans.forEach((t, i) => {
+        const lineWidth = t.getComputedTextLength();
+        const offset = (i - (n - 1) / 2) * built.lineHeight;
+        const availChord = offset >= c.r ? 0 : 2 * Math.sqrt(Math.max(0, c.r * c.r - offset * offset));
+        const budget = availChord * 0.86; // margin so text doesn't touch the circle edge
+        if (lineWidth > 0) requiredScale = Math.min(requiredScale, budget / lineWidth);
+      });
+      const heightBudget = c.r * 1.5;
+      const totalHeight = n * built.lineHeight;
+      requiredScale = Math.min(requiredScale, heightBudget / totalHeight, 1);
+      if (requiredScale < 0.98) {
+        g.removeChild(built.text);
+        fontSize = Math.max(0.0001, fontSize * requiredScale);
+        built = buildLabel(fontSize);
+        g.appendChild(built.text);
+      }
+      if (fontSize < enclosingRadius * 0.012) {
+        g.removeChild(built.text);
+      }
+    }
   });
 }
 
