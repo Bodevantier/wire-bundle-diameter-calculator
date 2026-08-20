@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wire Bundle Diameter Calculator</title>
+<meta name="description" content="Free online wire &amp; cable bundle diameter calculator. Build a wire catalog, add wires to a bundle, and instantly see the optimally packed bundle diameter with a live diagram.">
+<meta name="robots" content="index,follow">
+<meta property="og:title" content="Wire Bundle Diameter Calculator">
+<meta property="og:description" content="Compute the packed outer diameter of a wire or cable bundle and visualize the layout, right in your browser.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='none' stroke='%23667eea' stroke-width='3' stroke-dasharray='6,4'/%3E%3Ccircle cx='24' cy='26' r='9' fill='%23FF6B6B' stroke='%23333' stroke-width='1.5'/%3E%3Ccircle cx='40' cy='24' r='7' fill='%234ECDC4' stroke='%23333' stroke-width='1.5'/%3E%3Ccircle cx='34' cy='40' r='8' fill='%2345B7D1' stroke='%23333' stroke-width='1.5'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#eef1f7;
+    --panel-bg:#ffffff;
+    --border:#e3e8ee;
+    --border-strong:#d3dae4;
+    --text:#2c3e50;
+    --text-muted:#7f8c8d;
+    --primary-1:#667eea;
+    --primary-2:#764ba2;
+    --danger-1:#f093fb;
+    --danger-2:#f5576c;
+    --accent:#2196F3;
+    --success:#2ecc71;
+    --radius:10px;
+    --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.06);
+    --shadow-lg:0 10px 30px rgba(15,23,42,.10);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:linear-gradient(135deg,#f5f7fa 0%,#e9edf5 45%,#eef1f7 100%);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.4;
+    min-height:100vh;
+  }
+  a{color:var(--primary-1);}
+
+  .app-header{
+    padding:28px 20px 18px;
+    text-align:center;
+  }
+  .app-header h1{
+    margin:0 0 6px;
+    font-size:clamp(1.4rem,3vw,2rem);
+    background:linear-gradient(135deg,var(--primary-1) 0%,var(--primary-2) 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+    font-weight:800;
+  }
+  .app-header p{margin:0;color:var(--text-muted);font-size:.95rem;}
+
+  main.layout{
+    max-width:1280px;
+    margin:0 auto;
+    padding:6px 20px 60px;
+    display:grid;
+    grid-template-columns:minmax(320px,440px) 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width:900px){
+    main.layout{grid-template-columns:1fr;}
+  }
+
+  .panel{
+    background:var(--panel-bg);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:18px;
+  }
+  .panel + .panel{margin-top:20px;}
+  .panel h2{
+    margin:0 0 4px;
+    font-size:1.05rem;
+    font-weight:700;
+  }
+  .panel .hint{
+    margin:0 0 12px;
+    color:var(--text-muted);
+    font-size:.82rem;
+  }
+
+  .field-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  label{font-weight:600;font-size:.9rem;}
+  input[type=text],input[type=number]{
+    border:2px solid var(--border);
+    border-radius:6px;
+    padding:7px 9px;
+    font-size:.92rem;
+    background:#f8f9fa;
+    color:var(--text);
+    width:100%;
+  }
+  input[type=text]:focus,input[type=number]:focus,select:focus{
+    outline:none;
+    border-color:var(--primary-1);
+    background:#fff;
+  }
+  select{
+    border:2px solid var(--border);
+    border-radius:6px;
+    padding:7px 9px;
+    font-size:.9rem;
+    background:#f8f9fa;
+    color:var(--text);
+  }
+  .clearance-input{max-width:110px;}
+
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  .table-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+  thead th{
+    background:linear-gradient(135deg,var(--primary-1) 0%,var(--primary-2) 100%);
+    color:#fff;
+    font-weight:700;
+    text-align:left;
+    padding:8px 8px;
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:5px 6px;
+    border-bottom:1px solid #f0f0f0;
+  }
+  tbody tr:nth-child(even){background:#fafbfd;}
+  td.fn-cell{
+    text-align:center;
+    font-weight:700;
+    color:var(--text-muted);
+    width:34px;
+  }
+  table input[type=text],table input[type=number]{padding:5px 6px;font-size:.83rem;}
+  td.awg-cell input, td.diam-cell input{width:64px;}
+
+  .wires-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:360px;
+    overflow-y:auto;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px;
+    background:#fbfcfe;
+  }
+  .wire-row{display:flex;gap:8px;align-items:center;}
+  .wire-no-input{max-width:90px;flex:0 0 auto;}
+  .wire-fn-select{flex:1 1 auto;min-width:0;}
+
+  button{font:inherit;cursor:pointer;border:none;}
+  .btn{
+    background:linear-gradient(135deg,var(--primary-1) 0%,var(--primary-2) 100%);
+    color:#fff;
+    border-radius:6px;
+    padding:9px 16px;
+    font-weight:700;
+    font-size:.88rem;
+    box-shadow:0 2px 6px rgba(102,126,234,.35);
+    transition:filter .15s ease,transform .05s ease;
+  }
+  .btn:hover{filter:brightness(1.06);}
+  .btn:active{transform:translateY(1px);}
+  .btn.secondary{
+    background:#fff;
+    color:var(--text);
+    border:2px solid var(--border-strong);
+    box-shadow:none;
+  }
+  .btn.secondary:hover{border-color:var(--primary-1);color:var(--primary-1);}
+  .btn.block{width:100%;margin-top:10px;}
+  .btn.small{padding:6px 12px;font-size:.8rem;}
+
+  .icon-btn{
+    width:28px;height:28px;
+    border-radius:6px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:.85rem;
+    line-height:1;
+  }
+  .icon-btn.danger{
+    background:linear-gradient(135deg,var(--danger-1) 0%,var(--danger-2) 100%);
+    color:#fff;
+  }
+  .icon-btn.danger:hover{filter:brightness(1.05);}
+
+  .actions-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+  .actions-row .btn{flex:1 1 auto;}
+  input[type=file]{display:none;}
+
+  .results-card{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  #resultDiameter{
+    font-size:2rem;
+    font-weight:800;
+    color:var(--accent);
+  }
+  #resultMeta{color:var(--text-muted);font-size:.9rem;}
+
+  #emptyState{
+    padding:40px 20px;
+    text-align:center;
+    color:var(--text-muted);
+    border:2px dashed var(--border-strong);
+    border-radius:10px;
+  }
+
+  .viz-toolbar{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+
+  #vizWrap svg{
+    width:100%;
+    height:auto;
+    display:block;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:#fff;
+  }
+
+  .privacy-note{
+    margin-top:14px;
+    font-size:.78rem;
+    color:var(--text-muted);
+    text-align:center;
+  }
+
+  footer{
+    text-align:center;
+    color:var(--text-muted);
+    font-size:.78rem;
+    padding:10px 20px 40px;
+  }
+
+  #toastContainer{
+    position:fixed;
+    bottom:18px;
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    z-index:999;
+    align-items:center;
+    width:100%;
+    padding:0 12px;
+  }
+  .toast{
+    background:#2c3e50;
+    color:#fff;
+    padding:10px 16px;
+    border-radius:8px;
+    font-size:.85rem;
+    box-shadow:var(--shadow-lg);
+    opacity:0;
+    transform:translateY(8px);
+    transition:opacity .25s ease,transform .25s ease;
+    max-width:420px;
+    text-align:center;
+  }
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast-error{background:#c0392b;}
+  .toast-warn{background:#b9770e;}
+  .toast-success{background:#1e8449;}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Wire Bundle Diameter Calculator</h1>
+  <p class="subtitle">Build a wire/cable catalog, add wires to a bundle, and get the optimally packed bundle diameter instantly.</p>
+</header>
+
+<main class="layout">
+  <!-- LEFT: INPUTS -->
+  <section>
+    <div class="panel">
+      <h2>Settings</h2>
+      <p class="hint">Clearance is the extra gap left around each wire when packing (installation tolerance).</p>
+      <div class="field-row">
+        <label for="clearanceInput">Clearance (mm)</label>
+        <input id="clearanceInput" class="clearance-input" type="number" step="0.05" min="0" value="0.1">
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Wires &amp; Cable Setup</h2>
+      <p class="hint">Define the wire/cable types available for the bundle.</p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>FN</th><th>Part No.</th><th>Type</th><th>AWG</th><th>Ø(mm)</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="catalogBody"></tbody>
+        </table>
+      </div>
+      <button class="btn block" id="addFnBtn" type="button">➕ Add Wire/Cable Type</button>
+    </div>
+
+    <div class="panel">
+      <h2>Bundle Setup</h2>
+      <p class="hint">Add each wire/cable that belongs in the bundle and pick its type.</p>
+      <div class="wires-list" id="wiresBody"></div>
+      <button class="btn block" id="addWireBtn" type="button">➕ Add Wire</button>
+    </div>
+
+    <div class="panel">
+      <h2>Configuration</h2>
+      <p class="hint">Save your catalog + bundle to a file, or load one back in.</p>
+      <div class="actions-row">
+        <button class="btn secondary" id="exportBtn" type="button">📊 Export</button>
+        <button class="btn secondary" id="importBtn" type="button">📂 Import</button>
+        <button class="btn secondary" id="resetBtn" type="button">↺ Reset</button>
+        <input type="file" id="importFile" accept="application/json">
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: RESULTS -->
+  <section>
+    <div class="panel">
+      <h2>Wire Bundle Visualization</h2>
+      <div class="results-card">
+        <span id="resultDiameter">Ø — mm</span>
+        <span id="resultMeta">Add at least one wire to see results</span>
+      </div>
+
+      <div id="emptyState">Add at least one wire in <strong>Bundle Setup</strong> to see the packed diagram.</div>
+
+      <div id="vizWrap" hidden>
+        <svg id="bundleSvg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Packed wire bundle diagram"></svg>
+        <div class="viz-toolbar">
+          <button class="btn secondary small" id="downloadPngBtn" type="button">Download PNG</button>
+        </div>
+      </div>
+
+      <p class="privacy-note">Runs entirely in your browser — your wire data never leaves your device.</p>
+    </div>
+  </section>
+</main>
+
+<footer>Wire Bundle Diameter Calculator — packing based on the Huang et al. circle-packing heuristic.</footer>
+
+<div id="toastContainer"></div>
+
+<script>
+"use strict";
+
+/* ---------------------------------------------------------------------
+ * Circle-packing engine.
+ * Direct port of the Python `circlify` library (A1.0 heuristic by Huang
+ * et al. for packing + a Matousek-Sharir-Welzl style minimal enclosing
+ * circle, adapted from d3-hierarchy). Verified to match the original
+ * library's output bit-for-bit on reference data before being ported.
+ * ------------------------------------------------------------------- */
+const Circlify = (() => {
+  const EPS = Number.EPSILON;
+
+  function distance(c1, c2) {
+    const dx = c2.x - c1.x, dy = c2.y - c1.y;
+    return Math.sqrt(dx * dx + dy * dy) - c1.r - c2.r;
+  }
+
+  function getIntersection(c1, c2) {
+    const dx = c2.x - c1.x, dy = c2.y - c1.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d === 0) return [null, null];
+    const a = (c1.r * c1.r - c2.r * c2.r + d * d) / (2 * d);
+    const hsq = c1.r * c1.r - a * a;
+    if (hsq < 0) return [null, null];
+    const h = Math.sqrt(hsq);
+    const xm = c1.x + a * dx / d, ym = c1.y + a * dy / d;
+    const xs1 = xm + h * dy / d, xs2 = xm - h * dy / d;
+    const ys1 = ym - h * dx / d, ys2 = ym + h * dx / d;
+    if (xs1 === xs2 && ys1 === ys2) return [[xs1, ys1], null];
+    return [[xs1, ys1], [xs2, ys2]];
+  }
+
+  function getPlacementCandidates(radius, c1, c2) {
+    const margin = radius * EPS * 10.0;
+    const ic1 = { x: c1.x, y: c1.y, r: c1.r + radius + margin };
+    const ic2 = { x: c2.x, y: c2.y, r: c2.r + radius + margin };
+    const [i1, i2] = getIntersection(ic1, ic2);
+    if (i1 === null) return [null, null];
+    const cand1 = { x: i1[0], y: i1[1], r: radius };
+    if (i2 === null) return [cand1, null];
+    const cand2 = { x: i2[0], y: i2[1], r: radius };
+    return [cand1, cand2];
+  }
+
+  function getHoleDegree(candidate, circles) {
+    let sum = 0;
+    for (const c of circles) sum += distance(candidate, c) * c.r;
+    return sum;
+  }
+
+  function placeNew(radius, placed) {
+    placed = placed.slice();
+    const n = placed.length;
+    if (n <= 1) {
+      const x = n === 0 ? radius : -radius;
+      placed.push({ x, y: 0.0, r: radius });
+      return placed;
+    }
+    let mhd = null, lead = null;
+    const margin = radius * EPS * 10.0;
+    for (let i = 0; i < placed.length; i++) {
+      for (let j = i + 1; j < placed.length; j++) {
+        const c1 = placed[i], c2 = placed[j];
+        const others = placed.filter((_, k) => k !== i && k !== j);
+        const candidates = getPlacementCandidates(radius, c1, c2);
+        for (const cand of candidates) {
+          if (cand === null) continue;
+          if (others.length === 0) {
+            lead = cand;
+            break;
+          }
+          if (others.some(c => distance(c, cand) < 0.0)) continue;
+          const hd = getHoleDegree(cand, others);
+          if (mhd === null || hd < mhd) {
+            mhd = hd;
+            lead = cand;
+          }
+          if (mhd !== null && Math.abs(mhd) < margin) break;
+        }
+      }
+    }
+    if (lead === null) throw new Error("cannot place circle for radius " + radius);
+    placed.push(lead);
+    return placed;
+  }
+
+  function packA10(values) {
+    let placed = [];
+    const radii = values.map(v => Math.sqrt(v));
+    for (const r of radii) placed = placeNew(r, placed);
+    return placed;
+  }
+
+  function enclosesNot(a, b) {
+    const dr = a.r - b.r, dx = b.x - a.x, dy = b.y - a.y;
+    return dr < 0 || dr * dr < dx * dx + dy * dy;
+  }
+  function enclosesWeak(a, b) {
+    const dr = a.r - b.r + 1e-6, dx = b.x - a.x, dy = b.y - a.y;
+    return dr > 0 && dr * dr > dx * dx + dy * dy;
+  }
+  function enclosesWeakAll(a, B) {
+    for (const b of B) if (!enclosesWeak(a, b)) return false;
+    return true;
+  }
+  function encloseBasis2(a, b) {
+    const x21 = b.x - a.x, y21 = b.y - a.y, r21 = b.r - a.r;
+    const l21 = Math.sqrt(x21 * x21 + y21 * y21);
+    return {
+      x: (a.x + b.x + x21 / l21 * r21) / 2,
+      y: (a.y + b.y + y21 / l21 * r21) / 2,
+      r: (l21 + a.r + b.r) / 2,
+    };
+  }
+  function encloseBasis3(a, b, c) {
+    const x1 = a.x, y1 = a.y, r1 = a.r, x2 = b.x, y2 = b.y, r2 = b.r, x3 = c.x, y3 = c.y, r3 = c.r;
+    const a2 = x1 - x2, a3 = x1 - x3, b2 = y1 - y2, b3 = y1 - y3;
+    const c2 = r2 - r1, c3 = r3 - r1;
+    const d1 = x1 * x1 + y1 * y1 - r1 * r1;
+    const d2 = d1 - x2 * x2 - y2 * y2 + r2 * r2;
+    const d3 = d1 - x3 * x3 - y3 * y3 + r3 * r3;
+    const ab = a3 * b2 - a2 * b3;
+    const xa = (b2 * d3 - b3 * d2) / (ab * 2) - x1;
+    const xb = (b3 * c2 - b2 * c3) / ab;
+    const ya = (a3 * d2 - a2 * d3) / (ab * 2) - y1;
+    const yb = (a2 * c3 - a3 * c2) / ab;
+    const A = xb * xb + yb * yb - 1;
+    const B = 2 * (r1 + xa * xb + ya * yb);
+    const C = xa * xa + ya * ya - r1 * r1;
+    let r;
+    if (A !== 0.0) r = -(B + Math.sqrt(B * B - 4 * A * C)) / (2 * A);
+    else r = -C / B;
+    return { x: x1 + xa + xb * r, y: y1 + ya + yb * r, r };
+  }
+  function encloseBasis(B) {
+    if (B.length === 1) return B[0];
+    if (B.length === 2) return encloseBasis2(B[0], B[1]);
+    return encloseBasis3(B[0], B[1], B[2]);
+  }
+  function extendBasis(B, p) {
+    if (enclosesWeakAll(p, B)) return [p];
+    for (const bel of B) {
+      if (enclosesNot(p, bel) && enclosesWeakAll(encloseBasis2(bel, p), B)) return [bel, p];
+    }
+    for (let i = 0; i < B.length - 1; i++) {
+      for (let j = i + 1; j < B.length; j++) {
+        if (enclosesNot(encloseBasis2(B[i], B[j]), p) &&
+            enclosesNot(encloseBasis2(B[i], p), B[j]) &&
+            enclosesNot(encloseBasis2(B[j], p), B[i]) &&
+            enclosesWeakAll(encloseBasis3(B[i], B[j], p), B)) {
+          return [B[i], B[j], p];
+        }
+      }
+    }
+    throw new Error("extendBasis: unreachable");
+  }
+  function enclose(circles) {
+    let B = [], p = null, e = null;
+    const n = circles.length;
+    let i = 0;
+    while (i < n) {
+      p = circles[i];
+      if (e !== null && enclosesWeak(e, p)) {
+        i += 1;
+      } else {
+        B = extendBasis(B, p);
+        e = encloseBasis(B);
+        i = 0;
+      }
+    }
+    return e;
+  }
+  function scaleCircle(circle, target, enclosure) {
+    const r = target.r / enclosure.r;
+    return {
+      x: (circle.x - enclosure.x) * r + target.x,
+      y: (circle.y - enclosure.y) * r + target.y,
+      r: circle.r * r,
+    };
+  }
+
+  /** dataList: [{id, datum}] with datum > 0. Returns [{id,x,y,r}] packed into the unit circle. */
+  function pack(dataList) {
+    const sorted = dataList.slice().sort((a, b) => b.datum - a.datum);
+    const values = sorted.map(d => d.datum);
+    const packed = packA10(values);
+    const enclosure = enclose(packed);
+    const target = { x: 0, y: 0, r: 1 };
+    return sorted.map((d, idx) => {
+      const sc = scaleCircle(packed[idx], target, enclosure);
+      return { id: d.id, x: sc.x, y: sc.y, r: sc.r };
+    });
+  }
+
+  return { pack };
+})();
+
+/* ---------------------------------------------------------------------
+ * App state & UI
+ * ------------------------------------------------------------------- */
+const DEFAULT_CATALOG = {
+  1: { part_no: "396476-002", type: "S2xTP", awg: 24, diameter: 4.1 },
+  2: { part_no: "256575-122", type: "TSP", awg: 22, diameter: 2.76 },
+  3: { part_no: "973285-001", type: "S4xTP", awg: 24, diameter: 7.36 },
+  4: { part_no: "253828-249", type: "TSP", awg: 24, diameter: 3.3 },
+  6: { part_no: "230202-022", type: "C", awg: 22, diameter: 1.09 },
+};
+const DEFAULT_WIRES = [
+  { wire_no: "W19", fn: 6 }, { wire_no: "W20", fn: 6 },
+  { wire_no: "MC1", fn: 1 }, { wire_no: "MC2", fn: 2 },
+  { wire_no: "MC3", fn: 3 }, { wire_no: "MC4", fn: 4 },
+  { wire_no: "MC5", fn: 4 },
+];
+const DEFAULT_CLEARANCE = 0.1;
+const STORAGE_KEY = "wireBundleDiameterCalculator.v1";
+const PALETTE = ["#FF6B6B","#4ECDC4","#45B7D1","#FFA07A","#98D8C8","#F7DC6F","#BB8FCE","#85C1E2","#F8B88B","#A9DFBF"];
+
+function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+let state = {
+  clearance: DEFAULT_CLEARANCE,
+  catalog: clone(DEFAULT_CATALOG),
+  wires: clone(DEFAULT_WIRES),
+};
+
+function el(tag, attrs = {}, children = []) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "text") e.textContent = v;
+    else if (k === "value") e.value = v;
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) e.appendChild(c);
+  return e;
+}
+
+function sortedFns() {
+  return Object.keys(state.catalog).map(Number).sort((a, b) => a - b);
+}
+function nextFn() {
+  const fns = sortedFns();
+  return fns.length ? Math.max(...fns) + 1 : 1;
+}
+
+/* ---- catalog table ---- */
+function renderCatalog() {
+  const tbody = document.getElementById("catalogBody");
+  tbody.textContent = "";
+  for (const fn of sortedFns()) {
+    const row = state.catalog[fn];
+    const tr = el("tr");
+    tr.appendChild(el("td", { class: "fn-cell", text: String(fn) }));
+    tr.appendChild(el("td", {}, [el("input", { type: "text", value: row.part_no, "data-fn": fn, "data-field": "part_no" })]));
+    tr.appendChild(el("td", {}, [el("input", { type: "text", value: row.type, "data-fn": fn, "data-field": "type" })]));
+    tr.appendChild(el("td", { class: "awg-cell" }, [el("input", { type: "number", step: "1", value: row.awg, "data-fn": fn, "data-field": "awg" })]));
+    tr.appendChild(el("td", { class: "diam-cell" }, [el("input", { type: "number", step: "0.01", min: "0.01", value: row.diameter, "data-fn": fn, "data-field": "diameter" })]));
+    tr.appendChild(el("td", {}, [el("button", { class: "icon-btn danger remove-fn-btn", type: "button", "data-fn": fn, "aria-label": "Remove type", title: "Remove type", text: "✕" })]));
+    tbody.appendChild(tr);
+  }
+}
+
+function addFnRow() {
+  const fn = nextFn();
+  state.catalog[fn] = { part_no: `NEW-${String(fn).padStart(3, "0")}`, type: "NEW", awg: 22, diameter: 2.0 };
+  renderCatalog();
+  refreshWireFnOptions();
+  scheduleRecalc();
+  saveState();
+}
+
+function removeFn(fn) {
+  const inUse = state.wires.some(w => String(w.fn) === String(fn));
+  if (inUse) {
+    showToast(`Can't remove FN ${fn} — it's currently used by a wire in the bundle.`, "warn");
+    return;
+  }
+  if (sortedFns().length <= 1) {
+    showToast("At least one wire/cable type is required.", "warn");
+    return;
+  }
+  delete state.catalog[fn];
+  renderCatalog();
+  refreshWireFnOptions();
+  scheduleRecalc();
+  saveState();
+}
+
+/* ---- bundle wires ---- */
+function populateFnSelect(select, selectedFn) {
+  select.textContent = "";
+  for (const fn of sortedFns()) {
+    const c = state.catalog[fn];
+    select.appendChild(el("option", { value: fn, text: `FN ${fn}: ${c.type} (Ø ${c.diameter}mm)` }));
+  }
+  if (state.catalog[selectedFn]) select.value = selectedFn;
+}
+
+function renderWires() {
+  const container = document.getElementById("wiresBody");
+  container.textContent = "";
+  state.wires.forEach((w, idx) => {
+    const row = el("div", { class: "wire-row" });
+    row.appendChild(el("input", { type: "text", class: "wire-no-input", placeholder: "Wire No.", value: w.wire_no, "data-idx": idx }));
+    const select = el("select", { class: "wire-fn-select", "data-idx": idx });
+    populateFnSelect(select, w.fn);
+    row.appendChild(select);
+    row.appendChild(el("button", { class: "icon-btn danger remove-wire-btn", type: "button", "data-idx": idx, "aria-label": "Remove wire", title: "Remove wire", text: "✕" }));
+    container.appendChild(row);
+  });
+}
+
+function refreshWireFnOptions() {
+  document.querySelectorAll(".wire-fn-select").forEach(sel => {
+    const idx = Number(sel.dataset.idx);
+    populateFnSelect(sel, state.wires[idx].fn);
+  });
+}
+
+function addWireRow() {
+  const fallbackFn = sortedFns()[0] ?? 1;
+  state.wires.push({ wire_no: "", fn: fallbackFn });
+  renderWires();
+  scheduleRecalc();
+  saveState();
+  const inputs = document.querySelectorAll(".wire-no-input");
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+/* ---- calculation ---- */
+let recalcTimer = null;
+function scheduleRecalc() {
+  clearTimeout(recalcTimer);
+  recalcTimer = setTimeout(calculate, 250);
+}
+
+function calculate() {
+  const validWires = [];
+  for (const w of state.wires) {
+    const wireNo = (w.wire_no || "").trim();
+    if (!wireNo) continue;
+    const spec = state.catalog[w.fn];
+    if (!spec) continue;
+    const diameter = Number(spec.diameter);
+    if (!(diameter > 0)) continue;
+    validWires.push({ wire_no: wireNo, type: spec.type, awg: spec.awg, diameter });
+  }
+
+  if (validWires.length === 0) {
+    renderEmptyState();
+    return;
+  }
+
+  const clearance = Math.max(0, Number(state.clearance) || 0);
+  const circlesData = validWires.map((w, idx) => ({ id: idx, datum: Math.pow(w.diameter + 2 * clearance, 2) }));
+
+  let packed;
+  try {
+    packed = Circlify.pack(circlesData);
+  } catch (err) {
+    showToast("Could not pack this bundle — check for invalid diameters.", "error");
+    return;
+  }
+
+  const maxVirtualRadius = Math.max(...packed.map(c => c.r));
+  const maxRealRadius = Math.max(...validWires.map(w => (w.diameter + 2 * clearance) / 2));
+  const scaleFactor = maxRealRadius / maxVirtualRadius;
+
+  const scaledCircles = packed.map(c => {
+    const wire = validWires[c.id];
+    return { x: c.x * scaleFactor, y: c.y * scaleFactor, r: wire.diameter / 2, wire };
+  });
+
+  const enclosingRadius = Math.max(...scaledCircles.map(c => Math.hypot(c.x, c.y) + c.r + clearance));
+  const enclosingDiameter = enclosingRadius * 2;
+
+  renderResults(enclosingDiameter, validWires.length, clearance);
+  renderVisualization(scaledCircles, enclosingRadius, enclosingDiameter, validWires.length);
+}
+
+function renderResults(diameter, count, clearance) {
+  document.getElementById("resultDiameter").textContent = `Ø ${diameter.toFixed(2)} mm`;
+  document.getElementById("resultMeta").textContent = `${count} wire${count === 1 ? "" : "s"} · clearance ${clearance.toFixed(2)} mm`;
+  document.getElementById("emptyState").hidden = true;
+  document.getElementById("vizWrap").hidden = false;
+}
+function renderEmptyState() {
+  document.getElementById("resultDiameter").textContent = "Ø — mm";
+  document.getElementById("resultMeta").textContent = "Add at least one wire to see results";
+  document.getElementById("emptyState").hidden = false;
+  document.getElementById("vizWrap").hidden = true;
+}
+
+/* ---- visualization ---- */
+function renderVisualization(circles, enclosingRadius, enclosingDiameter, wireCount) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("bundleSvg");
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const padding = Math.max(2, enclosingRadius * 0.12);
+  const titleSpace = enclosingRadius * 0.28 + 3;
+  const halfW = enclosingRadius + padding;
+  const top = -(enclosingRadius + padding + titleSpace);
+  const bottom = enclosingRadius + padding;
+  const width = halfW * 2;
+  const height = bottom - top;
+
+  svg.setAttribute("viewBox", `${-halfW} ${top} ${width} ${height}`);
+  svg.setAttribute("width", "600");
+  svg.setAttribute("height", String(Math.round(600 * height / width)));
+
+  const bg = document.createElementNS(svgNS, "rect");
+  bg.setAttribute("x", -halfW); bg.setAttribute("y", top);
+  bg.setAttribute("width", width); bg.setAttribute("height", height);
+  bg.setAttribute("fill", "#ffffff");
+  svg.appendChild(bg);
+
+  const titleLine1 = "Wire Bundle Packing";
+  const titleLine2 = `Ø ${enclosingDiameter.toFixed(2)} mm  |  ${wireCount} wire${wireCount === 1 ? "" : "s"}`;
+  const longestLine = Math.max(titleLine1.length, titleLine2.length);
+  const estCharWidth = 0.58; // approx average glyph width as a fraction of font-size, bold sans-serif
+  const fontSizeByWidth = (width * 0.9) / (longestLine * estCharWidth);
+  const fontSizeByHeight = titleSpace / 2.6;
+  const titleFontSize = Math.max(0.01, Math.min(fontSizeByWidth, fontSizeByHeight));
+  const titleLineHeight = titleFontSize * 1.15;
+  const titleCenterY = top + titleSpace * 0.5;
+
+  const titleEl1 = document.createElementNS(svgNS, "text");
+  titleEl1.setAttribute("x", 0);
+  titleEl1.setAttribute("y", (titleCenterY - titleLineHeight * 0.5).toFixed(3));
+  titleEl1.setAttribute("text-anchor", "middle");
+  titleEl1.setAttribute("font-size", titleFontSize.toFixed(3));
+  titleEl1.setAttribute("font-weight", "700");
+  titleEl1.setAttribute("fill", "#2c3e50");
+  titleEl1.setAttribute("font-family", "sans-serif");
+  titleEl1.textContent = titleLine1;
+  svg.appendChild(titleEl1);
+
+  const titleEl2 = document.createElementNS(svgNS, "text");
+  titleEl2.setAttribute("x", 0);
+  titleEl2.setAttribute("y", (titleCenterY + titleLineHeight * 0.65).toFixed(3));
+  titleEl2.setAttribute("text-anchor", "middle");
+  titleEl2.setAttribute("font-size", titleFontSize.toFixed(3));
+  titleEl2.setAttribute("font-weight", "600");
+  titleEl2.setAttribute("fill", "#2196F3");
+  titleEl2.setAttribute("font-family", "sans-serif");
+  titleEl2.textContent = titleLine2;
+  svg.appendChild(titleEl2);
+
+  const enc = document.createElementNS(svgNS, "circle");
+  enc.setAttribute("cx", 0); enc.setAttribute("cy", 0); enc.setAttribute("r", enclosingRadius);
+  enc.setAttribute("fill", "none");
+  enc.setAttribute("stroke", "#2196F3");
+  enc.setAttribute("stroke-width", Math.max(0.15, enclosingRadius * 0.006).toFixed(3));
+  enc.setAttribute("stroke-dasharray", "2,1.4");
+  svg.appendChild(enc);
+
+  circles.forEach((c, idx) => {
+    const color = PALETTE[idx % PALETTE.length];
+    const g = document.createElementNS(svgNS, "g");
+
+    const tip = document.createElementNS(svgNS, "title");
+    tip.textContent = `${c.wire.wire_no} — ${c.wire.type}, AWG ${c.wire.awg}, Ø ${c.wire.diameter} mm`;
+    g.appendChild(tip);
+
+    const circle = document.createElementNS(svgNS, "circle");
+    circle.setAttribute("cx", c.x.toFixed(4)); circle.setAttribute("cy", c.y.toFixed(4)); circle.setAttribute("r", c.r.toFixed(4));
+    circle.setAttribute("fill", color);
+    circle.setAttribute("fill-opacity", "0.78");
+    circle.setAttribute("stroke", "#333333");
+    circle.setAttribute("stroke-width", Math.max(0.08, c.r * 0.03).toFixed(3));
+    g.appendChild(circle);
+
+    if (c.r >= enclosingRadius * 0.045) {
+      const fontSize = Math.min(c.r * 0.42, Math.max(c.r * 0.28, 1.1));
+      const lines = [c.wire.wire_no, c.wire.type, `AWG ${c.wire.awg}`, `Ø${c.wire.diameter}`];
+      const text = document.createElementNS(svgNS, "text");
+      text.setAttribute("x", c.x.toFixed(4));
+      text.setAttribute("y", c.y.toFixed(4));
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("font-size", fontSize.toFixed(3));
+      text.setAttribute("fill", "#1a1a1a");
+      text.setAttribute("font-family", "sans-serif");
+      const lineHeight = fontSize * 1.05;
+      const startDy = -((lines.length - 1) / 2) * lineHeight;
+      lines.forEach((line, li) => {
+        const tspan = document.createElementNS(svgNS, "tspan");
+        tspan.setAttribute("x", c.x.toFixed(4));
+        tspan.setAttribute("dy", (li === 0 ? startDy : lineHeight).toFixed(3));
+        if (li === 0) tspan.setAttribute("font-weight", "700");
+        tspan.textContent = line;
+        text.appendChild(tspan);
+      });
+      g.appendChild(text);
+    }
+    svg.appendChild(g);
+  });
+}
+
+/* ---- export / import / download ---- */
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportConfig() {
+  const config = {
+    clearance_mm: state.clearance,
+    catalog: state.catalog,
+    wires: state.wires.map(w => ({ wire_no: w.wire_no, FN: w.fn })),
+  };
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+  triggerDownload(blob, "wire_bundle_config.json");
+  showToast("Configuration exported.", "success");
+}
+
+function importConfigFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (typeof data.clearance_mm === "number") state.clearance = data.clearance_mm;
+
+      if (data.catalog && typeof data.catalog === "object") {
+        const newCatalog = {};
+        for (const [fn, spec] of Object.entries(data.catalog)) {
+          newCatalog[fn] = {
+            part_no: String(spec.part_no ?? ""),
+            type: String(spec.type ?? ""),
+            awg: Number(spec.awg) || 0,
+            diameter: Number(spec.diameter) || 0,
+          };
+        }
+        if (Object.keys(newCatalog).length) state.catalog = newCatalog;
+      }
+      if (Array.isArray(data.wires)) {
+        state.wires = data.wires
+          .map(w => ({ wire_no: String(w.wire_no ?? ""), fn: Number(w.FN ?? w.fn) }))
+          .filter(w => w.wire_no && state.catalog[w.fn]);
+      }
+
+      document.getElementById("clearanceInput").value = state.clearance;
+      renderCatalog();
+      renderWires();
+      scheduleRecalc();
+      saveState();
+      showToast("Configuration imported.", "success");
+    } catch (err) {
+      showToast("Could not read that file — is it a valid exported configuration?", "error");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function downloadPNG() {
+  const svg = document.getElementById("bundleSvg");
+  const vb = svg.viewBox.baseVal;
+  if (!vb.width || !vb.height) return;
+  const targetMax = 1600;
+  const aspect = vb.width / vb.height;
+  const w = aspect >= 1 ? targetMax : targetMax * aspect;
+  const h = aspect >= 1 ? targetMax / aspect : targetMax;
+
+  const svgClone = svg.cloneNode(true);
+  svgClone.setAttribute("width", Math.round(w));
+  svgClone.setAttribute("height", Math.round(h));
+  const svgStr = new XMLSerializer().serializeToString(svgClone);
+  const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(w);
+    canvas.height = Math.round(h);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(blob => {
+      if (blob) triggerDownload(blob, "wire-bundle-diagram.png");
+    });
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    showToast("Could not generate image.", "error");
+  };
+  img.src = url;
+}
+
+/* ---- reset / persistence ---- */
+function resetToDefaults() {
+  if (!confirm("Reset to the default example bundle? This clears your current catalog and wire list.")) return;
+  state = { clearance: DEFAULT_CLEARANCE, catalog: clone(DEFAULT_CATALOG), wires: clone(DEFAULT_WIRES) };
+  document.getElementById("clearanceInput").value = state.clearance;
+  renderCatalog();
+  renderWires();
+  scheduleRecalc();
+  saveState();
+}
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return false;
+    if (data.catalog && typeof data.catalog === "object" && Object.keys(data.catalog).length) state.catalog = data.catalog;
+    if (Array.isArray(data.wires)) state.wires = data.wires;
+    if (typeof data.clearance === "number") state.clearance = data.clearance;
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ---- toasts ---- */
+function showToast(message, type = "info") {
+  const container = document.getElementById("toastContainer");
+  const toast = el("div", { class: `toast toast-${type}`, text: message });
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+/* ---- event wiring ---- */
+function wireUpEvents() {
+  document.getElementById("clearanceInput").addEventListener("input", ev => {
+    const v = parseFloat(ev.target.value);
+    state.clearance = isNaN(v) ? 0 : Math.max(0, v);
+    scheduleRecalc(); saveState();
+  });
+
+  document.getElementById("addFnBtn").addEventListener("click", addFnRow);
+  document.getElementById("addWireBtn").addEventListener("click", addWireRow);
+  document.getElementById("resetBtn").addEventListener("click", resetToDefaults);
+  document.getElementById("exportBtn").addEventListener("click", exportConfig);
+  document.getElementById("downloadPngBtn").addEventListener("click", downloadPNG);
+
+  const importFile = document.getElementById("importFile");
+  document.getElementById("importBtn").addEventListener("click", () => importFile.click());
+  importFile.addEventListener("change", () => {
+    if (importFile.files && importFile.files[0]) importConfigFile(importFile.files[0]);
+    importFile.value = "";
+  });
+
+  const catalogBody = document.getElementById("catalogBody");
+  catalogBody.addEventListener("input", ev => {
+    const t = ev.target;
+    if (t.tagName !== "INPUT") return;
+    const fn = t.dataset.fn, field = t.dataset.field;
+    if (!state.catalog[fn]) return;
+    if (field === "awg") state.catalog[fn].awg = parseInt(t.value, 10) || 0;
+    else if (field === "diameter") state.catalog[fn].diameter = parseFloat(t.value) || 0;
+    else state.catalog[fn][field] = t.value;
+    refreshWireFnOptions();
+    scheduleRecalc(); saveState();
+  });
+  catalogBody.addEventListener("click", ev => {
+    const btn = ev.target.closest(".remove-fn-btn");
+    if (btn) removeFn(btn.dataset.fn);
+  });
+
+  const wiresBody = document.getElementById("wiresBody");
+  wiresBody.addEventListener("input", ev => {
+    const t = ev.target;
+    if (!t.classList.contains("wire-no-input")) return;
+    state.wires[Number(t.dataset.idx)].wire_no = t.value;
+    scheduleRecalc(); saveState();
+  });
+  wiresBody.addEventListener("change", ev => {
+    const t = ev.target;
+    if (!t.classList.contains("wire-fn-select")) return;
+    state.wires[Number(t.dataset.idx)].fn = Number(t.value);
+    scheduleRecalc(); saveState();
+  });
+  wiresBody.addEventListener("click", ev => {
+    const btn = ev.target.closest(".remove-wire-btn");
+    if (!btn) return;
+    state.wires.splice(Number(btn.dataset.idx), 1);
+    renderWires();
+    scheduleRecalc(); saveState();
+  });
+}
+
+function init() {
+  loadState();
+  document.getElementById("clearanceInput").value = state.clearance;
+  renderCatalog();
+  renderWires();
+  wireUpEvents();
+  calculate();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
