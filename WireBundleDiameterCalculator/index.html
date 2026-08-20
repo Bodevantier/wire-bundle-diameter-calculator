@@ -55,15 +55,15 @@
   .app-header p{margin:0;color:var(--text-muted);font-size:.95rem;}
 
   main.layout{
-    max-width:1280px;
+    max-width:1440px;
     margin:0 auto;
     padding:6px 20px 60px;
     display:grid;
-    grid-template-columns:minmax(320px,440px) 1fr;
+    grid-template-columns:minmax(360px,580px) 1fr;
     gap:20px;
     align-items:start;
   }
-  @media (max-width:900px){
+  @media (max-width:1020px){
     main.layout{grid-template-columns:1fr;}
   }
 
@@ -556,17 +556,12 @@ const Circlify = (() => {
  * App state & UI
  * ------------------------------------------------------------------- */
 const DEFAULT_CATALOG = {
-  1: { part_no: "EX-1001", type: "Single", awg: 20, diameter: 1.6 },
-  2: { part_no: "EX-1002", type: "Twisted Pair", awg: 22, diameter: 2.4 },
-  3: { part_no: "EX-1003", type: "Shielded", awg: 18, diameter: 3.2 },
-  4: { part_no: "EX-1004", type: "Coax", awg: 24, diameter: 2.0 },
-  5: { part_no: "EX-1005", type: "Multi-Core", awg: 16, diameter: 4.5 },
+  1: { part_no: "EX-1001", type: "C", awg: 22, diameter: 1.24 },
 };
 const DEFAULT_WIRES = [
-  { wire_no: "Wire-01", fn: 1 }, { wire_no: "Wire-02", fn: 1 },
-  { wire_no: "Wire-03", fn: 2 }, { wire_no: "Wire-04", fn: 2 },
-  { wire_no: "Wire-05", fn: 3 }, { wire_no: "Wire-06", fn: 4 },
-  { wire_no: "Wire-07", fn: 5 },
+  { wire_no: "W1", fn: 1 }, { wire_no: "W2", fn: 1 },
+  { wire_no: "W3", fn: 1 }, { wire_no: "W4", fn: 1 },
+  { wire_no: "W5", fn: 1 }, { wire_no: "W6", fn: 1 },
 ];
 const DEFAULT_CLEARANCE = 0.1;
 const STORAGE_KEY = "wireBundleDiameterCalculator.v1";
@@ -803,14 +798,21 @@ function renderVisualization(circles, enclosingRadius, enclosingDiameter, wireCo
   titleEl2.textContent = titleLine2;
   svg.appendChild(titleEl2);
 
-  const encStrokeWidth = Math.max(0.15, enclosingRadius * 0.006);
+  const encStrokeWidth = Math.max(0.16, enclosingRadius * 0.009);
+  // Evenly-spaced dashes with no leftover partial dash at the seam: pick a dash
+  // count from the circumference, then derive dash/gap so N whole segments tile
+  // the circle exactly.
+  const circumference = 2 * Math.PI * enclosingRadius;
+  const dashCount = Math.max(12, Math.round(circumference / (enclosingRadius * 0.21)));
+  const segment = circumference / dashCount;
+  const dashLen = segment * 0.58;
+  const gapLen = segment - dashLen;
   const enc = document.createElementNS(svgNS, "circle");
   enc.setAttribute("cx", 0); enc.setAttribute("cy", 0); enc.setAttribute("r", enclosingRadius);
   enc.setAttribute("fill", "none");
   enc.setAttribute("stroke", "#2196F3");
   enc.setAttribute("stroke-width", encStrokeWidth.toFixed(3));
-  enc.setAttribute("stroke-linecap", "round");
-  enc.setAttribute("stroke-dasharray", `0.01,${(encStrokeWidth * 4.5).toFixed(3)}`);
+  enc.setAttribute("stroke-dasharray", `${dashLen.toFixed(3)},${gapLen.toFixed(3)}`);
   svg.appendChild(enc);
 
   circles.forEach((c, idx) => {
