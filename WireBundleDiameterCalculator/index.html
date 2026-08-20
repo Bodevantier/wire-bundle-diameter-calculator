@@ -748,8 +748,13 @@ function renderVisualization(circles, enclosingRadius, enclosingDiameter, wireCo
   const svg = document.getElementById("bundleSvg");
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-  const padding = Math.max(2, enclosingRadius * 0.12);
-  const titleSpace = enclosingRadius * 0.28 + 3;
+  // Everything here scales purely off enclosingRadius (no fixed-mm minimums) —
+  // the SVG always stretches to fill the same pixel width regardless of the
+  // bundle's true mm size, so an absolute-mm floor looks fine at one scale and
+  // comically thick/oversized at another. Pure proportions render consistently
+  // at any size.
+  const padding = enclosingRadius * 0.22;
+  const titleSpace = enclosingRadius * 0.6;
   const halfW = enclosingRadius + padding;
   const top = -(enclosingRadius + padding + titleSpace);
   const bottom = enclosingRadius + padding;
@@ -798,7 +803,7 @@ function renderVisualization(circles, enclosingRadius, enclosingDiameter, wireCo
   titleEl2.textContent = titleLine2;
   svg.appendChild(titleEl2);
 
-  const encStrokeWidth = Math.max(0.16, enclosingRadius * 0.009);
+  const encStrokeWidth = enclosingRadius * 0.019;
   // Evenly-spaced dashes with no leftover partial dash at the seam: pick a dash
   // count from the circumference, then derive dash/gap so N whole segments tile
   // the circle exactly.
@@ -828,7 +833,7 @@ function renderVisualization(circles, enclosingRadius, enclosingDiameter, wireCo
     circle.setAttribute("fill", color);
     circle.setAttribute("fill-opacity", "0.78");
     circle.setAttribute("stroke", "#333333");
-    circle.setAttribute("stroke-width", Math.max(0.08, c.r * 0.03).toFixed(3));
+    circle.setAttribute("stroke-width", (c.r * 0.035).toFixed(4));
     g.appendChild(circle);
     svg.appendChild(g);
 
