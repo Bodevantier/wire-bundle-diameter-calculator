@@ -327,7 +327,7 @@
       <div class="bulk-add-row">
         <label for="bulkAddCount" class="bulk-add-label">Add</label>
         <input type="number" id="bulkAddCount" class="bulk-count-input" min="1" max="300" value="10">
-        <label for="bulkAddFn" class="bulk-add-label">wires of</label>
+        <label for="bulkAddFn" class="bulk-add-label">wires/cables of</label>
         <select id="bulkAddFn" class="bulk-fn-select"></select>
         <button class="btn secondary small" id="bulkAddBtn" type="button">Add</button>
       </div>
@@ -828,12 +828,15 @@ const Circlify = (() => {
  * App state & UI
  * ------------------------------------------------------------------- */
 const DEFAULT_CATALOG = {
-  1: { part_no: "NEW-001", type: "SINGLE", awg: 22, diameter: 1.24 },
+  1: { part_no: "NEW-001", type: "TP", awg: 24, diameter: 3 },
+  2: { part_no: "NEW-002", type: "TSP", awg: 24, diameter: 6 },
+  3: { part_no: "NEW-003", type: "SINGLE", awg: 22, diameter: 2 },
 };
 const DEFAULT_WIRES = [
   { wire_no: "W1", fn: 1 }, { wire_no: "W2", fn: 1 },
-  { wire_no: "W3", fn: 1 }, { wire_no: "W4", fn: 1 },
-  { wire_no: "W5", fn: 1 }, { wire_no: "W6", fn: 1 },
+  { wire_no: "W3", fn: 2 }, { wire_no: "W4", fn: 2 },
+  { wire_no: "W5", fn: 3 }, { wire_no: "W6", fn: 3 },
+  { wire_no: "W7", fn: 3 }, { wire_no: "W8", fn: 3 },
 ];
 const DEFAULT_CLEARANCE = 0.1;
 const STORAGE_KEY = "wireBundleDiameterCalculator.v1";
