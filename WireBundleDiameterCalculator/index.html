@@ -55,15 +55,15 @@
   .app-header p{margin:0;color:var(--text-muted);font-size:.95rem;}
 
   main.layout{
-    max-width:1440px;
+    max-width:1600px;
     margin:0 auto;
     padding:6px 20px 60px;
     display:grid;
-    grid-template-columns:minmax(360px,580px) 1fr;
+    grid-template-columns:720px 1fr;
     gap:20px;
     align-items:start;
   }
-  @media (max-width:1020px){
+  @media (max-width:1250px){
     main.layout{grid-template-columns:1fr;}
   }
 
@@ -80,6 +80,7 @@
     font-size:1.05rem;
     font-weight:700;
   }
+  .panel-compact h2{margin-bottom:10px;}
   .panel .hint{
     margin:0 0 12px;
     color:var(--text-muted);
@@ -131,12 +132,19 @@
     text-align:center;
     font-weight:700;
     color:var(--text-muted);
-    width:34px;
+    width:28px;
   }
   table input[type=text],table input[type=number]{padding:5px 6px;font-size:.83rem;}
-  td.awg-cell input, td.diam-cell input{width:64px;}
-  td.part-cell input{width:120px;}
-  td.type-cell input{width:90px;}
+  td.awg-cell input, td.diam-cell input{width:55px;}
+  td.part-cell input{width:95px;}
+  td.type-cell select{
+    width:280px;
+    font-size:.8rem;
+    padding:5px 4px;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    overflow:hidden;
+  }
 
   .wires-list{
     display:flex;
@@ -152,6 +160,11 @@
   .wire-row{display:flex;gap:8px;align-items:center;}
   .wire-no-input{max-width:90px;flex:0 0 auto;}
   .wire-fn-select{flex:1 1 auto;min-width:0;}
+
+  .bulk-add-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border-strong);}
+  .bulk-add-label{font-weight:600;font-size:.82rem;color:var(--text-muted);}
+  .bulk-count-input{width:64px;flex:0 0 auto;}
+  .bulk-fn-select{flex:1 1 140px;min-width:0;border:2px solid var(--border);border-radius:6px;padding:6px 8px;font-size:.85rem;background:#f8f9fa;color:var(--text);}
 
   button{font:inherit;cursor:pointer;border:none;}
   .btn{
@@ -216,7 +229,12 @@
     border-radius:10px;
   }
 
-  .viz-toolbar{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+  .viz-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;}
+
+  .viz-toggles{display:flex;gap:8px;flex-wrap:wrap;}
+  .segmented{display:inline-flex;border:2px solid var(--border-strong);border-radius:6px;overflow:hidden;}
+  .seg-btn{background:#fff;color:var(--text-muted);padding:6px 10px;font-size:.8rem;font-weight:600;}
+  .seg-btn.active{background:linear-gradient(135deg,var(--primary-1) 0%,var(--primary-2) 100%);color:#fff;}
 
   #vizWrap svg{
     width:100%;
@@ -225,13 +243,6 @@
     border:1px solid var(--border);
     border-radius:8px;
     background:#fff;
-  }
-
-  .privacy-note{
-    margin-top:14px;
-    font-size:.78rem;
-    color:var(--text-muted);
-    text-align:center;
   }
 
   footer{
@@ -313,11 +324,17 @@
       <p class="hint">Add each wire/cable that belongs in the bundle and pick its type.</p>
       <div class="wires-list" id="wiresBody"></div>
       <button class="btn block" id="addWireBtn" type="button">➕ Add Wire</button>
+      <div class="bulk-add-row">
+        <label for="bulkAddCount" class="bulk-add-label">Add</label>
+        <input type="number" id="bulkAddCount" class="bulk-count-input" min="1" max="300" value="10">
+        <label for="bulkAddFn" class="bulk-add-label">wires of</label>
+        <select id="bulkAddFn" class="bulk-fn-select"></select>
+        <button class="btn secondary small" id="bulkAddBtn" type="button">Add</button>
+      </div>
     </div>
 
-    <div class="panel">
+    <div class="panel panel-compact">
       <h2>Configuration</h2>
-      <p class="hint">Save your catalog + bundle to a file, or load one back in.</p>
       <div class="actions-row">
         <button class="btn secondary" id="exportBtn" type="button">📊 Export</button>
         <button class="btn secondary" id="importBtn" type="button">📂 Import</button>
@@ -341,11 +358,19 @@
       <div id="vizWrap" hidden>
         <svg id="bundleSvg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Packed wire bundle diagram"></svg>
         <div class="viz-toolbar">
+          <div class="viz-toggles">
+            <div class="segmented" id="colorModeToggle" role="group" aria-label="Diagram color mode">
+              <button type="button" class="seg-btn" data-mode="color">🎨 Color</button>
+              <button type="button" class="seg-btn" data-mode="grayscale">◐ Grayscale</button>
+            </div>
+            <div class="segmented" id="labelModeToggle" role="group" aria-label="Diagram label detail">
+              <button type="button" class="seg-btn" data-labelmode="detailed">Detailed</button>
+              <button type="button" class="seg-btn" data-labelmode="simple">Simple</button>
+            </div>
+          </div>
           <button class="btn secondary small" id="downloadPngBtn" type="button">Download PNG</button>
         </div>
       </div>
-
-      <p class="privacy-note">Runs entirely in your browser — your wire data never leaves your device.</p>
     </div>
   </section>
 </main>
@@ -399,9 +424,27 @@ const Circlify = (() => {
     return [cand1, cand2];
   }
 
-  function getHoleDegree(candidate, circles) {
+  // Checks/scores a candidate against every already-placed circle except the
+  // two (i, j) it was built from — without allocating a filtered copy of
+  // `placed` per candidate. That allocation, repeated for every (i,j) pair
+  // and every new circle, made the greedy pass scale roughly O(n^4) and was
+  // the main cause of multi-hundred-ms stalls once a bundle passed ~100
+  // wires. Iterating with two skipped indices instead is exactly equivalent
+  // (same terms, same order, so identical floating-point results) but with
+  // no per-candidate allocation.
+  function isValidCandidate(cand, placed, skipI, skipJ) {
+    for (let k = 0; k < placed.length; k++) {
+      if (k === skipI || k === skipJ) continue;
+      if (distance(placed[k], cand) < 0.0) return false;
+    }
+    return true;
+  }
+  function holeDegreeExcluding(cand, placed, skipI, skipJ) {
     let sum = 0;
-    for (const c of circles) sum += distance(candidate, c) * c.r;
+    for (let k = 0; k < placed.length; k++) {
+      if (k === skipI || k === skipJ) continue;
+      sum += distance(placed[k], cand) * placed[k].r;
+    }
     return sum;
   }
 
@@ -415,19 +458,19 @@ const Circlify = (() => {
     }
     let mhd = null, lead = null;
     const margin = radius * EPS * 10.0;
+    const hasOthers = placed.length > 2; // placed.length - 2 is constant across all (i,j) pairs here
     for (let i = 0; i < placed.length; i++) {
       for (let j = i + 1; j < placed.length; j++) {
         const c1 = placed[i], c2 = placed[j];
-        const others = placed.filter((_, k) => k !== i && k !== j);
         const candidates = getPlacementCandidates(radius, c1, c2);
         for (const cand of candidates) {
           if (cand === null) continue;
-          if (others.length === 0) {
+          if (!hasOthers) {
             lead = cand;
             break;
           }
-          if (others.some(c => distance(c, cand) < 0.0)) continue;
-          const hd = getHoleDegree(cand, others);
+          if (!isValidCandidate(cand, placed, i, j)) continue;
+          const hd = holeDegreeExcluding(cand, placed, i, j);
           if (mhd === null || hd < mhd) {
             mhd = hd;
             lead = cand;
@@ -591,42 +634,113 @@ const Circlify = (() => {
   }
 
   // circles: [{x,y,r}]. Mutates a copy; never modifies the input.
-  function relax(circles, iterations, pullFrac0, rng) {
-    const pts = circles.map(c => ({ x: c.x, y: c.y, r: c.r }));
+  // Faithful port of d3-force's collision-resolution formula (forceCollide,
+  // https://github.com/d3/d3-force/blob/main/src/collide.js — ISC license,
+  // Mike Bostock/Observable), the same technique behind D3's "bubble chart"
+  // layouts of differently-sized circles used across countless production
+  // dashboards. Ported by hand (rather than loaded from a CDN) to keep this
+  // page a single dependency-free file; the pairwise loop below is the O(n^2)
+  // form of the same math d3-force runs per pair via its quadtree — only the
+  // spatial index for finding nearby pairs quickly is left out, not the
+  // physics. The key difference from a naive "split the overlap 50/50"
+  // approach: each pair's correction is split by the SQUARE of the other
+  // circle's radius, so a small circle does nearly all of the moving out of
+  // a big one's way instead of nudging it back — letting a swarm of small
+  // wires perturb a large one (and each other) every step was what kept
+  // wide-size-range bundles from ever settling into a well-interleaved
+  // layout.
+  function resolveCollisions(pts, rng) {
     const n = pts.length;
-    const cooldownEnd = iterations * 0.75;
-    for (let it = 0; it < iterations; it++) {
-      const pullFrac = pullFrac0 * Math.max(0, 1 - it / cooldownEnd);
-      if (pullFrac > 0) {
-        for (const p of pts) {
-          const d = Math.hypot(p.x, p.y);
-          if (d > 1e-9) {
-            const step = Math.min(pullFrac * p.r, d);
-            p.x -= (p.x / d) * step;
-            p.y -= (p.y / d) * step;
-          }
+    for (let i = 0; i < n; i++) {
+      const a = pts[i];
+      const xi = a.x + a.vx, yi = a.y + a.vy;
+      for (let j = i + 1; j < n; j++) {
+        const b = pts[j];
+        let x = xi - (b.x + b.vx);
+        let y = yi - (b.y + b.vy);
+        const r = a.r + b.r;
+        let l = x * x + y * y;
+        if (l < r * r) {
+          if (x === 0) { x = (rng() - 0.5) * 1e-6; l += x * x; }
+          if (y === 0) { y = (rng() - 0.5) * 1e-6; l += y * y; }
+          l = (r - (l = Math.sqrt(l))) / l;
+          const bShareA = (b.r * b.r) / (a.r * a.r + b.r * b.r);
+          const bShareB = 1 - bShareA;
+          a.vx += x * l * bShareA; a.vy += y * l * bShareA;
+          b.vx -= x * l * bShareB; b.vy -= y * l * bShareB;
         }
       }
+    }
+  }
+
+  function relax(circles, iterations, pullFrac0, rng) {
+    const pts = circles.map(c => ({ x: c.x, y: c.y, r: c.r, vx: 0, vy: 0 }));
+    // Same exponential alpha schedule d3-force's simulation uses by default
+    // (alphaMin = 0.001, decaying from 1 over the given tick count) to fade
+    // the centering pull out — collision resolution itself is never
+    // alpha-scaled in d3-force, it always runs at full strength every tick.
+    const alphaMin = 0.001;
+    const alphaDecay = 1 - Math.pow(alphaMin, 1 / iterations);
+    const velocityDecay = 0.6; // d3-force's default damping factor
+    const centerStrength = pullFrac0 * 12;
+    let alpha = 1;
+
+    for (let it = 0; it < iterations; it++) {
+      if (centerStrength > 0) {
+        for (const p of pts) {
+          p.vx -= p.x * centerStrength * alpha;
+          p.vy -= p.y * centerStrength * alpha;
+        }
+      }
+      resolveCollisions(pts, rng);
+      for (const p of pts) {
+        p.x += p.vx *= velocityDecay;
+        p.y += p.vy *= velocityDecay;
+      }
+      alpha += (0 - alpha) * alphaDecay;
+    }
+    return pts;
+  }
+
+  // Velocity+damping settles into a good arrangement but, unlike a direct
+  // position correction, isn't guaranteed to fully zero out every overlap —
+  // dense/disparate-size bundles can still have measurable residual
+  // penetration. That's a fine approximation while comparing candidate
+  // trials against each other, but a wire bundle diameter is a real spec
+  // number: whichever layout is actually kept must be genuinely
+  // non-overlapping, not just "small" because a few wires are sitting
+  // inside each other. This runs once, only on the winning trial, with its
+  // own time budget so it can never hang regardless of bundle size.
+  function settleOverlaps(pts, rng, deadlineAt) {
+    const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const n = pts.length;
+    for (let pass = 0; pass < 20000; pass++) {
+      let maxPenetration = 0;
       for (let i = 0; i < n; i++) {
         for (let j = i + 1; j < n; j++) {
           const a = pts[i], b = pts[j];
           let dx = b.x - a.x, dy = b.y - a.y;
-          let dist = Math.hypot(dx, dy);
+          let dist = Math.sqrt(dx * dx + dy * dy);
           const minD = a.r + b.r;
           if (dist < minD) {
             if (dist < 1e-9) {
               const ang = rng() * 2 * Math.PI;
               dx = Math.cos(ang); dy = Math.sin(ang); dist = 1e-6;
             }
-            const overlap = (minD - dist) * 1.001; // slight overshoot avoids float-dust residual overlap
+            const penetration = minD - dist;
+            if (penetration > maxPenetration) maxPenetration = penetration;
+            const overlap = penetration * 1.001;
             const ux = dx / dist, uy = dy / dist;
-            a.x -= (ux * overlap) / 2; a.y -= (uy * overlap) / 2;
-            b.x += (ux * overlap) / 2; b.y += (uy * overlap) / 2;
+            const bShareA = (b.r * b.r) / (a.r * a.r + b.r * b.r);
+            const bShareB = 1 - bShareA;
+            a.x -= ux * overlap * bShareA; a.y -= uy * overlap * bShareA;
+            b.x += ux * overlap * bShareB; b.y += uy * overlap * bShareB;
           }
         }
       }
+      if (maxPenetration < 1e-7) break;
+      if (now() > deadlineAt) break; // safety net — never hang, even mid-convergence
     }
-    return pts;
   }
 
   function enclosingDiameterOf(positions, radii) {
@@ -643,9 +757,20 @@ const Circlify = (() => {
   function packBest(dataList, rPackById, opts) {
     opts = opts || {};
     const n = dataList.length;
-    const trials = opts.trials ?? (n <= 10 ? 24 : n <= 20 ? 12 : n <= 40 ? 5 : n <= 80 ? 2 : 1);
-    const iterations = opts.iterations ?? (n <= 20 ? 1000 : n <= 40 ? 600 : n <= 80 ? 350 : 200);
+    // Iterations per trial: enough that the last ~25% (pure overlap
+    // resolution, once relax()'s center-pull has faded out) can actually let
+    // circles slide past each other into a well-mixed layout. Too few here
+    // is what let big and small circles settle into separate clusters
+    // instead of interleaving, even though they'd nest together better.
+    const iterations = opts.iterations ?? (n <= 20 ? 1200 : n <= 60 ? 900 : n <= 150 ? 650 : n <= 300 ? 400 : 250);
     const pullFrac = opts.pullFrac ?? 0.025;
+    // Instead of a fixed trial count, keep trying random-start layouts until
+    // this much time has been spent. Cheap/small bundles get far more
+    // attempts than before; huge ones still get several without risking a
+    // multi-second UI freeze. (opts.trials still works as a hard cap.)
+    const timeBudgetMs = opts.timeBudgetMs ?? 900;
+    const maxTrials = opts.trials ?? Infinity;
+    const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
     const greedyVirtual = pack(dataList);
     const maxVirtualR = Math.max(...greedyVirtual.map(c => c.r));
@@ -664,10 +789,13 @@ const Circlify = (() => {
     const polishedD = enclosingDiameterOf(polished, radii);
     if (polishedD < bestDiameter) { bestDiameter = polishedD; bestPositions = polished; }
 
-    // Random-start trials to escape the greedy method's local optimum.
+    // Random-start trials to escape the greedy method's local optimum — run
+    // as many as fit in the time budget rather than a fixed count.
     const totalArea = radii.reduce((s, r) => s + Math.PI * r * r, 0);
     const spread = 1.3 * Math.sqrt(totalArea / Math.PI) + 2;
-    for (let t = 0; t < trials; t++) {
+    const deadline = now() + timeBudgetMs;
+    let t = 0;
+    while (t < maxTrials && now() < deadline) {
       const start = radii.map(r => ({
         x: (rng() * 2 - 1) * spread,
         y: (rng() * 2 - 1) * spread,
@@ -676,7 +804,12 @@ const Circlify = (() => {
       const result = relax(start, iterations, pullFrac, rng);
       const d = enclosingDiameterOf(result, radii);
       if (d < bestDiameter) { bestDiameter = d; bestPositions = result; }
+      t++;
     }
+
+    const settled = bestPositions.map((p, i) => ({ x: p.x, y: p.y, r: radii[i] }));
+    settleOverlaps(settled, rng, now() + 400);
+    bestPositions = settled;
 
     const enclosure = enclose(bestPositions.map((p, i) => ({ x: p.x, y: p.y, r: radii[i] })));
     const circles = ids.map((id, i) => ({
@@ -695,7 +828,7 @@ const Circlify = (() => {
  * App state & UI
  * ------------------------------------------------------------------- */
 const DEFAULT_CATALOG = {
-  1: { part_no: "EX-1001", type: "C", awg: 22, diameter: 1.24 },
+  1: { part_no: "NEW-001", type: "SINGLE", awg: 22, diameter: 1.24 },
 };
 const DEFAULT_WIRES = [
   { wire_no: "W1", fn: 1 }, { wire_no: "W2", fn: 1 },
@@ -705,6 +838,93 @@ const DEFAULT_WIRES = [
 const DEFAULT_CLEARANCE = 0.1;
 const STORAGE_KEY = "wireBundleDiameterCalculator.v1";
 const PALETTE = ["#FF6B6B","#4ECDC4","#45B7D1","#FFA07A","#98D8C8","#F7DC6F","#BB8FCE","#85C1E2","#F8B88B","#A9DFBF"];
+
+/* ---------------------------------------------------------------------
+ * Wire/cable "type" catalog. Each type describes one or more twisted
+ * conductor "groups" (a 2TSP has two independently-shielded groups in
+ * one jacket); this same data drives both the Type dropdown and the
+ * cross-section drawn inside each wire's circle in the diagram.
+ * ------------------------------------------------------------------- */
+const SHIELD_COLOR = "#9aa0a6";
+const CORE_COLOR = "#c9822b"; // bare copper core
+const JACKET_COLOR = "#f2f2ef"; // outer cable jacket
+
+const WIRE_TYPES = [
+  { code: "SINGLE", label: "Single wire",
+    groups: [{ n: 1, shielded: false, cx: 0, cy: 0, colors: ["#2c2c2c"] }] },
+  { code: "SHIELD1", label: "Shielded single wire",
+    groups: [{ n: 1, shielded: true, cx: 0, cy: 0, colors: ["#2c2c2c"] }] },
+  { code: "TP", label: "TP – Twisted Pair",
+    groups: [{ n: 2, shielded: false, cx: 0, cy: 0, colors: ["#d64545", "#1a1a1a"] }] },
+  { code: "TSP", label: "TSP – Twisted Shielded Pair",
+    groups: [{ n: 2, shielded: true, cx: 0, cy: 0, colors: ["#d64545", "#1a1a1a"] }] },
+  { code: "TRIAD", label: "Triad – Twisted Triple",
+    groups: [{ n: 3, shielded: false, cx: 0, cy: 0, colors: ["#d64545", "#1a1a1a", "#f2f2f2"] }] },
+  { code: "STT", label: "STT – Shielded Twisted Triple",
+    groups: [{ n: 3, shielded: true, cx: 0, cy: 0, colors: ["#d64545", "#1a1a1a", "#f2f2f2"] }] },
+  { code: "QUAD", label: "Quad – Twisted 4-Conductor",
+    groups: [{ n: 4, shielded: false, cx: 0, cy: 0, colors: ["#d64545", "#1a1a1a", "#f2f2f2", "#3465a4"] }] },
+  { code: "SQUAD", label: "Shielded Twisted Quad",
+    groups: [{ n: 4, shielded: true, cx: 0, cy: 0, colors: ["#d64545", "#1a1a1a", "#f2f2f2", "#3465a4"] }] },
+  { code: "2TP", label: "2TP – Two Twisted Pairs",
+    groups: [
+      { n: 2, shielded: false, cx: -0.46, cy: 0, colors: ["#d64545", "#1a1a1a"] },
+      { n: 2, shielded: false, cx: 0.46, cy: 0, colors: ["#f2f2f2", "#3465a4"] },
+    ] },
+  { code: "2TSP", label: "2TSP – Two Twisted Shielded Pairs",
+    groups: [
+      { n: 2, shielded: true, cx: -0.46, cy: 0, colors: ["#d64545", "#1a1a1a"] },
+      { n: 2, shielded: true, cx: 0.46, cy: 0, colors: ["#f2f2f2", "#3465a4"] },
+    ] },
+];
+const WIRE_TYPE_BY_CODE = Object.fromEntries(WIRE_TYPES.map(t => [t.code, t]));
+const DEFAULT_TYPE_CODE = "SINGLE";
+
+function normalizeTypeCode(code) {
+  return WIRE_TYPE_BY_CODE[code] ? code : DEFAULT_TYPE_CODE;
+}
+function getTypeDef(code) {
+  return WIRE_TYPE_BY_CODE[normalizeTypeCode(code)];
+}
+
+/* ---- color mode: colored vs. grayscale diagram ---- */
+const COLOR_MODE_KEY = "wireBundleDiameterCalculator.colorMode.v1";
+let colorMode = "color"; // "color" | "grayscale"
+function loadColorMode() {
+  try {
+    const saved = localStorage.getItem(COLOR_MODE_KEY);
+    if (saved === "grayscale" || saved === "color") colorMode = saved;
+  } catch (e) { /* storage unavailable */ }
+}
+function saveColorMode() {
+  try { localStorage.setItem(COLOR_MODE_KEY, colorMode); } catch (e) { /* storage unavailable */ }
+}
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  const full = h.length === 3 ? h.split("").map(ch => ch + ch).join("") : h;
+  const num = parseInt(full, 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+function toGrayscale(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const y = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
+  const v = y.toString(16).padStart(2, "0");
+  return `#${v}${v}${v}`;
+}
+function col(hex) { return colorMode === "grayscale" ? toGrayscale(hex) : hex; }
+
+/* ---- label mode: full detail vs. wire-number-only ---- */
+const LABEL_MODE_KEY = "wireBundleDiameterCalculator.labelMode.v1";
+let labelMode = "detailed"; // "detailed" | "simple"
+function loadLabelMode() {
+  try {
+    const saved = localStorage.getItem(LABEL_MODE_KEY);
+    if (saved === "simple" || saved === "detailed") labelMode = saved;
+  } catch (e) { /* storage unavailable */ }
+}
+function saveLabelMode() {
+  try { localStorage.setItem(LABEL_MODE_KEY, labelMode); } catch (e) { /* storage unavailable */ }
+}
 
 function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
 
@@ -733,6 +953,20 @@ function nextFn() {
   return fns.length ? Math.max(...fns) + 1 : 1;
 }
 
+function existingWireNoNumbers() {
+  const nums = [];
+  for (const w of state.wires) {
+    const m = /^W(\d+)$/i.exec((w.wire_no || "").trim());
+    if (m) nums.push(parseInt(m[1], 10));
+  }
+  return nums;
+}
+function nextWireNo() {
+  const nums = existingWireNoNumbers();
+  const max = nums.length ? Math.max(...nums) : 0;
+  return `W${max + 1}`;
+}
+
 /* ---- catalog table ---- */
 function renderCatalog() {
   const tbody = document.getElementById("catalogBody");
@@ -742,7 +976,11 @@ function renderCatalog() {
     const tr = el("tr");
     tr.appendChild(el("td", { class: "fn-cell", text: String(fn) }));
     tr.appendChild(el("td", { class: "part-cell" }, [el("input", { type: "text", value: row.part_no, "data-fn": fn, "data-field": "part_no" })]));
-    tr.appendChild(el("td", { class: "type-cell" }, [el("input", { type: "text", value: row.type, "data-fn": fn, "data-field": "type" })]));
+    const typeSelect = el("select", { "data-fn": fn, "data-field": "type" });
+    for (const t of WIRE_TYPES) typeSelect.appendChild(el("option", { value: t.code, text: t.label }));
+    typeSelect.value = normalizeTypeCode(row.type);
+    typeSelect.title = getTypeDef(row.type).label; // full name on hover — the column is too narrow to show it all
+    tr.appendChild(el("td", { class: "type-cell" }, [typeSelect]));
     tr.appendChild(el("td", { class: "awg-cell" }, [el("input", { type: "number", step: "1", value: row.awg, "data-fn": fn, "data-field": "awg" })]));
     tr.appendChild(el("td", { class: "diam-cell" }, [el("input", { type: "number", step: "0.01", min: "0.01", value: row.diameter, "data-fn": fn, "data-field": "diameter" })]));
     tr.appendChild(el("td", {}, [el("button", { class: "icon-btn danger remove-fn-btn", type: "button", "data-fn": fn, "aria-label": "Remove type", title: "Remove type", text: "✕" })]));
@@ -752,7 +990,7 @@ function renderCatalog() {
 
 function addFnRow() {
   const fn = nextFn();
-  state.catalog[fn] = { part_no: `NEW-${String(fn).padStart(3, "0")}`, type: "NEW", awg: 22, diameter: 2.0 };
+  state.catalog[fn] = { part_no: `NEW-${String(fn).padStart(3, "0")}`, type: "SINGLE", awg: 22, diameter: 2.0 };
   renderCatalog();
   refreshWireFnOptions();
   scheduleRecalc();
@@ -805,16 +1043,47 @@ function refreshWireFnOptions() {
     const idx = Number(sel.dataset.idx);
     populateFnSelect(sel, state.wires[idx].fn);
   });
+  populateBulkFnSelect();
+}
+
+function populateBulkFnSelect() {
+  const select = document.getElementById("bulkAddFn");
+  if (!select) return;
+  const prevValue = select.value;
+  select.textContent = "";
+  for (const fn of sortedFns()) {
+    const c = state.catalog[fn];
+    select.appendChild(el("option", { value: fn, text: `FN ${fn}: ${c.type} (Ø ${c.diameter}mm)` }));
+  }
+  if (state.catalog[prevValue]) select.value = prevValue;
 }
 
 function addWireRow() {
   const fallbackFn = sortedFns()[0] ?? 1;
-  state.wires.push({ wire_no: "", fn: fallbackFn });
+  state.wires.push({ wire_no: nextWireNo(), fn: fallbackFn });
   renderWires();
   scheduleRecalc();
   saveState();
   const inputs = document.querySelectorAll(".wire-no-input");
-  if (inputs.length) inputs[inputs.length - 1].focus();
+  if (inputs.length) { inputs[inputs.length - 1].focus(); inputs[inputs.length - 1].select(); }
+}
+
+function addBulkWires() {
+  const countInput = document.getElementById("bulkAddCount");
+  const fnSelect = document.getElementById("bulkAddFn");
+  const count = Math.max(1, Math.min(300, parseInt(countInput.value, 10) || 0));
+  const fn = Number(fnSelect.value);
+  if (!state.catalog[fn]) {
+    showToast("Add a wire/cable type in the catalog first.", "warn");
+    return;
+  }
+  for (let i = 0; i < count; i++) {
+    state.wires.push({ wire_no: nextWireNo(), fn });
+  }
+  renderWires();
+  scheduleRecalc();
+  saveState();
+  showToast(`Added ${count} wire${count === 1 ? "" : "s"} of FN ${fn} (${state.catalog[fn].type}).`, "success");
 }
 
 /* ---- calculation ---- */
@@ -879,6 +1148,120 @@ function renderEmptyState() {
 }
 
 /* ---- visualization ---- */
+
+/** Normalized (fraction-of-group-radius) offsets for n conductors twisted
+ * together — a trefoil for 3, an even ring for 4+, matching how real
+ * cable cross-sections lay their conductors out. */
+function conductorOffsets(n) {
+  if (n === 1) return [{ x: 0, y: 0 }];
+  if (n === 2) return [{ x: -0.5, y: 0 }, { x: 0.5, y: 0 }];
+  if (n === 3) {
+    const d = 0.55;
+    return [0, 1, 2].map(i => {
+      const a = -Math.PI / 2 + i * (2 * Math.PI / 3);
+      return { x: d * Math.cos(a), y: d * Math.sin(a) };
+    });
+  }
+  const d = 0.6;
+  return Array.from({ length: n }, (_, i) => {
+    const a = Math.PI / 4 + i * (2 * Math.PI / n);
+    return { x: d * Math.cos(a), y: d * Math.sin(a) };
+  });
+}
+
+function appendDashedCircle(container, svgNS, cx, cy, r, strokeWidth, segmentLen, dashFrac, colorHex) {
+  const circumference = 2 * Math.PI * r;
+  const dashCount = Math.max(8, Math.round(circumference / segmentLen));
+  const segment = circumference / dashCount;
+  const dashLen = segment * dashFrac;
+  const gapLen = segment - dashLen;
+  const circle = document.createElementNS(svgNS, "circle");
+  circle.setAttribute("cx", cx.toFixed(4)); circle.setAttribute("cy", cy.toFixed(4)); circle.setAttribute("r", r.toFixed(4));
+  circle.setAttribute("fill", "none");
+  circle.setAttribute("stroke", colorHex);
+  circle.setAttribute("stroke-width", strokeWidth.toFixed(4));
+  circle.setAttribute("stroke-dasharray", `${dashLen.toFixed(3)},${gapLen.toFixed(3)}`);
+  container.appendChild(circle);
+  return circle;
+}
+
+/** A shielded group's braid: a solid gray band with a denser dashed
+ * overlay on top, so it reads as woven strands rather than a flat ring. */
+function drawShieldRing(container, svgNS, cx, cy, r, thickness) {
+  const base = document.createElementNS(svgNS, "circle");
+  base.setAttribute("cx", cx.toFixed(4)); base.setAttribute("cy", cy.toFixed(4)); base.setAttribute("r", r.toFixed(4));
+  base.setAttribute("fill", "none");
+  base.setAttribute("stroke", col(SHIELD_COLOR));
+  base.setAttribute("stroke-width", thickness.toFixed(4));
+  container.appendChild(base);
+  appendDashedCircle(container, svgNS, cx, cy, r, thickness, Math.max(thickness * 1.6, r * 0.05), 0.55, col("#5f6469"));
+}
+
+const DETAIL_MIN_R_FRAC = 0.05; // below this fraction of the enclosing radius, skip internal detail
+
+/** Draws one wire's cross-section: outer jacket, any shield(s), and each
+ * conductor as an insulation ring + copper core, per its WIRE_TYPES entry. */
+function drawWireCrossSection(g, svgNS, c, idx, enclosingRadius) {
+  const typeDef = getTypeDef(c.wire.type);
+  const cx = c.x, cy = c.y, r = c.r;
+
+  if (r < enclosingRadius * DETAIL_MIN_R_FRAC) {
+    const flat = document.createElementNS(svgNS, "circle");
+    flat.setAttribute("cx", cx.toFixed(4)); flat.setAttribute("cy", cy.toFixed(4)); flat.setAttribute("r", r.toFixed(4));
+    flat.setAttribute("fill", col(PALETTE[idx % PALETTE.length]));
+    flat.setAttribute("fill-opacity", "0.85");
+    flat.setAttribute("stroke", col("#333333"));
+    flat.setAttribute("stroke-width", (r * 0.06).toFixed(4));
+    g.appendChild(flat);
+    return;
+  }
+
+  const isBareSingle = typeDef.groups.length === 1 && typeDef.groups[0].n === 1 && !typeDef.groups[0].shielded;
+
+  if (!isBareSingle) {
+    const jacket = document.createElementNS(svgNS, "circle");
+    jacket.setAttribute("cx", cx.toFixed(4)); jacket.setAttribute("cy", cy.toFixed(4)); jacket.setAttribute("r", r.toFixed(4));
+    jacket.setAttribute("fill", col(JACKET_COLOR));
+    jacket.setAttribute("stroke", col("#333333"));
+    jacket.setAttribute("stroke-width", (r * 0.035).toFixed(4));
+    g.appendChild(jacket);
+  }
+
+  const multiGroup = typeDef.groups.length > 1;
+  for (const group of typeDef.groups) {
+    const gcx = cx + group.cx * r;
+    const gcy = cy + group.cy * r;
+    const gr = isBareSingle ? r * 0.97
+      : multiGroup ? r * 0.46
+      : r * (group.shielded ? 0.82 : 0.88);
+
+    if (group.shielded) {
+      drawShieldRing(g, svgNS, gcx, gcy, gr * 0.82, gr * 0.16);
+    }
+    const conductorAreaR = isBareSingle ? gr : (group.shielded ? gr * 0.62 : gr * 0.8);
+    const offsets = conductorOffsets(group.n);
+    offsets.forEach((off, i) => {
+      const ccx = gcx + off.x * conductorAreaR;
+      const ccy = gcy + off.y * conductorAreaR;
+      const insR = conductorAreaR * (group.n === 1 ? 0.82 : 0.46);
+      const coreR = insR * 0.55;
+      const insColor = group.colors[i % group.colors.length];
+
+      const ins = document.createElementNS(svgNS, "circle");
+      ins.setAttribute("cx", ccx.toFixed(4)); ins.setAttribute("cy", ccy.toFixed(4)); ins.setAttribute("r", insR.toFixed(4));
+      ins.setAttribute("fill", col(insColor));
+      ins.setAttribute("stroke", col("#1a1a1a"));
+      ins.setAttribute("stroke-width", (insR * 0.09).toFixed(4));
+      g.appendChild(ins);
+
+      const core = document.createElementNS(svgNS, "circle");
+      core.setAttribute("cx", ccx.toFixed(4)); core.setAttribute("cy", ccy.toFixed(4)); core.setAttribute("r", coreR.toFixed(4));
+      core.setAttribute("fill", col(CORE_COLOR));
+      g.appendChild(core);
+    });
+  }
+}
+
 function renderVisualization(circles, enclosingRadius, enclosingDiameter, wireCount) {
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.getElementById("bundleSvg");
@@ -939,50 +1322,37 @@ function renderVisualization(circles, enclosingRadius, enclosingDiameter, wireCo
   titleEl2.textContent = titleLine2;
   svg.appendChild(titleEl2);
 
-  const encStrokeWidth = enclosingRadius * 0.019;
   // Evenly-spaced dashes with no leftover partial dash at the seam: pick a dash
   // count from the circumference, then derive dash/gap so N whole segments tile
   // the circle exactly.
-  const circumference = 2 * Math.PI * enclosingRadius;
-  const dashCount = Math.max(12, Math.round(circumference / (enclosingRadius * 0.21)));
-  const segment = circumference / dashCount;
-  const dashLen = segment * 0.58;
-  const gapLen = segment - dashLen;
-  const enc = document.createElementNS(svgNS, "circle");
-  enc.setAttribute("cx", 0); enc.setAttribute("cy", 0); enc.setAttribute("r", enclosingRadius);
-  enc.setAttribute("fill", "none");
-  enc.setAttribute("stroke", "#2196F3");
-  enc.setAttribute("stroke-width", encStrokeWidth.toFixed(3));
-  enc.setAttribute("stroke-dasharray", `${dashLen.toFixed(3)},${gapLen.toFixed(3)}`);
-  svg.appendChild(enc);
+  appendDashedCircle(svg, svgNS, 0, 0, enclosingRadius, enclosingRadius * 0.019, enclosingRadius * 0.21, 0.58, col("#2196F3"));
 
   circles.forEach((c, idx) => {
-    const color = PALETTE[idx % PALETTE.length];
+    const typeDef = getTypeDef(c.wire.type);
     const g = document.createElementNS(svgNS, "g");
 
     const tip = document.createElementNS(svgNS, "title");
-    tip.textContent = `${c.wire.wire_no} — ${c.wire.type}, AWG ${c.wire.awg}, Ø ${c.wire.diameter} mm`;
+    tip.textContent = `${c.wire.wire_no} — ${typeDef.label}, AWG ${c.wire.awg}, Ø ${c.wire.diameter} mm`;
     g.appendChild(tip);
 
-    const circle = document.createElementNS(svgNS, "circle");
-    circle.setAttribute("cx", c.x.toFixed(4)); circle.setAttribute("cy", c.y.toFixed(4)); circle.setAttribute("r", c.r.toFixed(4));
-    circle.setAttribute("fill", color);
-    circle.setAttribute("fill-opacity", "0.78");
-    circle.setAttribute("stroke", "#333333");
-    circle.setAttribute("stroke-width", (c.r * 0.035).toFixed(4));
-    g.appendChild(circle);
+    drawWireCrossSection(g, svgNS, c, idx, enclosingRadius);
     svg.appendChild(g);
 
-    if (c.r >= enclosingRadius * 0.02) {
+    if (labelMode !== "simple" && c.r >= enclosingRadius * 0.02) {
       const labelLines = [c.wire.wire_no, c.wire.type, `AWG ${c.wire.awg}`, `Ø${c.wire.diameter}`];
       const buildLabel = (fontSize) => {
         const text = document.createElementNS(svgNS, "text");
         text.setAttribute("x", c.x.toFixed(4));
         text.setAttribute("y", c.y.toFixed(4));
         text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dominant-baseline", "central");
         text.setAttribute("font-size", fontSize.toFixed(4));
-        text.setAttribute("fill", "#1a1a1a");
+        text.setAttribute("fill", col("#1a1a1a"));
         text.setAttribute("font-family", "sans-serif");
+        text.setAttribute("paint-order", "stroke");
+        text.setAttribute("stroke", col("#ffffff"));
+        text.setAttribute("stroke-width", (fontSize * 0.35).toFixed(4));
+        text.setAttribute("stroke-linejoin", "round");
         const lineHeight = fontSize * 1.08;
         const startDy = -((labelLines.length - 1) / 2) * lineHeight;
         labelLines.forEach((line, li) => {
@@ -1065,7 +1435,7 @@ function importConfigFile(file) {
         for (const [fn, spec] of Object.entries(data.catalog)) {
           newCatalog[fn] = {
             part_no: String(spec.part_no ?? ""),
-            type: String(spec.type ?? ""),
+            type: normalizeTypeCode(String(spec.type ?? "")),
             awg: Number(spec.awg) || 0,
             diameter: Number(spec.diameter) || 0,
           };
@@ -1081,6 +1451,7 @@ function importConfigFile(file) {
       document.getElementById("clearanceInput").value = state.clearance;
       renderCatalog();
       renderWires();
+      populateBulkFnSelect();
       scheduleRecalc();
       saveState();
       showToast("Configuration imported.", "success");
@@ -1135,6 +1506,7 @@ function resetToDefaults() {
   document.getElementById("clearanceInput").value = state.clearance;
   renderCatalog();
   renderWires();
+  populateBulkFnSelect();
   scheduleRecalc();
   saveState();
 }
@@ -1148,7 +1520,10 @@ function loadState() {
     if (!raw) return false;
     const data = JSON.parse(raw);
     if (!data || typeof data !== "object") return false;
-    if (data.catalog && typeof data.catalog === "object" && Object.keys(data.catalog).length) state.catalog = data.catalog;
+    if (data.catalog && typeof data.catalog === "object" && Object.keys(data.catalog).length) {
+      state.catalog = data.catalog;
+      for (const fn of Object.keys(state.catalog)) state.catalog[fn].type = normalizeTypeCode(state.catalog[fn].type);
+    }
     if (Array.isArray(data.wires)) state.wires = data.wires;
     if (typeof data.clearance === "number") state.clearance = data.clearance;
     return true;
@@ -1177,9 +1552,18 @@ function wireUpEvents() {
 
   document.getElementById("addFnBtn").addEventListener("click", addFnRow);
   document.getElementById("addWireBtn").addEventListener("click", addWireRow);
+  document.getElementById("bulkAddBtn").addEventListener("click", addBulkWires);
   document.getElementById("resetBtn").addEventListener("click", resetToDefaults);
   document.getElementById("exportBtn").addEventListener("click", exportConfig);
   document.getElementById("downloadPngBtn").addEventListener("click", downloadPNG);
+  document.getElementById("colorModeToggle").addEventListener("click", ev => {
+    const btn = ev.target.closest(".seg-btn");
+    if (btn) setColorMode(btn.dataset.mode);
+  });
+  document.getElementById("labelModeToggle").addEventListener("click", ev => {
+    const btn = ev.target.closest(".seg-btn");
+    if (btn) setLabelMode(btn.dataset.labelmode);
+  });
 
   const importFile = document.getElementById("importFile");
   document.getElementById("importBtn").addEventListener("click", () => importFile.click());
@@ -1197,6 +1581,16 @@ function wireUpEvents() {
     if (field === "awg") state.catalog[fn].awg = parseInt(t.value, 10) || 0;
     else if (field === "diameter") state.catalog[fn].diameter = parseFloat(t.value) || 0;
     else state.catalog[fn][field] = t.value;
+    refreshWireFnOptions();
+    scheduleRecalc(); saveState();
+  });
+  catalogBody.addEventListener("change", ev => {
+    const t = ev.target;
+    if (t.tagName !== "SELECT" || t.dataset.field !== "type") return;
+    const fn = t.dataset.fn;
+    if (!state.catalog[fn]) return;
+    state.catalog[fn].type = t.value;
+    t.title = getTypeDef(t.value).label;
     refreshWireFnOptions();
     scheduleRecalc(); saveState();
   });
@@ -1227,12 +1621,31 @@ function wireUpEvents() {
   });
 }
 
+function setColorMode(mode) {
+  colorMode = mode === "grayscale" ? "grayscale" : "color";
+  saveColorMode();
+  document.querySelectorAll("#colorModeToggle .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === colorMode));
+  calculate();
+}
+
+function setLabelMode(mode) {
+  labelMode = mode === "simple" ? "simple" : "detailed";
+  saveLabelMode();
+  document.querySelectorAll("#labelModeToggle .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.labelmode === labelMode));
+  calculate();
+}
+
 function init() {
   loadState();
+  loadColorMode();
+  loadLabelMode();
   document.getElementById("clearanceInput").value = state.clearance;
   renderCatalog();
   renderWires();
+  populateBulkFnSelect();
   wireUpEvents();
+  document.querySelectorAll("#colorModeToggle .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === colorMode));
+  document.querySelectorAll("#labelModeToggle .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.labelmode === labelMode));
   calculate();
 }
 
